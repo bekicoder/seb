@@ -1,0 +1,7 @@
+// netlify/functions/seb-api/package.json
+{
+  "name": "seb-api",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {}
+}
