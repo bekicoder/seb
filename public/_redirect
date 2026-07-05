@@ -1,5 +1,9 @@
-# API routes to functions
+# API routes
 /api/*  /.netlify/functions/seb-api/:splat  200
 
-# SPA routing - catch all other routes
+# Admin panel
+/admin  /admin/index.html  200
+/admin/*  /admin/index.html  200
+
+# Fallback for SPA
 /*  /index.html  200
