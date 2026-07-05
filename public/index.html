@@ -51,6 +51,30 @@
         align-items: center;
         gap: 0.6rem;
         border: 1px solid rgba(255, 215, 120, 0.2);
+        position: relative;
+        overflow: hidden;
+      }
+      .btn-download-yellow .progress-bar {
+        position: absolute;
+        left: 0;
+        top: 0;
+        height: 100%;
+        background: rgba(255, 255, 255, 0.15);
+        transition: width 0.3s ease;
+        width: 0%;
+        pointer-events: none;
+        border-radius: 9999px;
+      }
+      .btn-download-yellow .btn-content {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+      }
+      .btn-download-yellow.downloading {
+        cursor: wait;
+        opacity: 0.8;
       }
       .btn-download-yellow:hover {
         background: #d4912e;
@@ -195,6 +219,11 @@
         background: #e8f5e9;
         border-color: #66bb6a;
       }
+      /* Progress text */
+      .progress-text {
+        font-size: 0.7rem;
+        opacity: 0.7;
+      }
     </style>
   </head>
 
@@ -217,28 +246,31 @@
         <div class="text-faint/30 text-sm font-mono">v2</div>
       </div>
 
-      <!-- Download Button -->
+      <!-- Download Button with Progress -->
       <div class="flex justify-center mb-8">
-        <a
-          href="#"
+        <button
           id="patcherDownloadBtn"
           class="btn-download-yellow"
           onclick="downloadPatcher(event)"
         >
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-            <path
-              d="M12 4v12m0 0l-4-4m4 4l4-4"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
-          Download Patcher (.exe)
-        </a>
+          <span class="progress-bar" id="downloadProgressBar"></span>
+          <span class="btn-content" id="downloadBtnContent">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+              <path
+                d="M12 4v12m0 0l-4-4m4 4l4-4"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            <span id="downloadBtnText">Download Patcher (.exe)</span>
+            <span id="downloadProgressText" class="progress-text"></span>
+          </span>
+        </button>
       </div>
 
       <!-- Upload Section -->
@@ -403,28 +435,95 @@
       }
 
       // ============================================================
-      // DOWNLOAD PATCHER
+      // DOWNLOAD PATCHER WITH PROGRESS
       // ============================================================
       async function downloadPatcher(e) {
         e.preventDefault();
+
+        const btn = document.getElementById("patcherDownloadBtn");
+        const btnText = document.getElementById("downloadBtnText");
+        const progressBar = document.getElementById("downloadProgressBar");
+        const progressText = document.getElementById("downloadProgressText");
+
+        // Check if already downloading
+        if (btn.classList.contains("downloading")) return;
+
         try {
-          const response = await fetch(
-            "https://raw.githubusercontent.com/your-username/your-repo/main/public/downloads/seb_patch.exe"
-          );
+          // Update button state
+          btn.classList.add("downloading");
+          btnText.textContent = "Downloading...";
+          progressBar.style.width = "0%";
+          progressText.textContent = "0%";
+
+          const url =
+            "https://github.com/example-seb/seb/releases/download/v1.0/SEBPatcher.exe";
+
+          const response = await fetch(url);
+
           if (!response.ok) throw new Error("Download failed");
 
-          const blob = await response.blob();
-          const url = URL.createObjectURL(blob);
+          const contentLength = response.headers.get("content-length");
+          const total = contentLength ? parseInt(contentLength, 10) : 0;
+
+          const reader = response.body.getReader();
+          let loaded = 0;
+          const chunks = [];
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            chunks.push(value);
+            loaded += value.length;
+
+            if (total > 0) {
+              const percent = Math.round((loaded / total) * 100);
+              progressBar.style.width = percent + "%";
+              progressText.textContent = percent + "%";
+            } else {
+              const kb = Math.round(loaded / 1024);
+              progressText.textContent = kb + " KB";
+            }
+
+            // Update button text with progress
+            if (total > 0) {
+              const percent = Math.round((loaded / total) * 100);
+              btnText.textContent = `Downloading ${percent}%`;
+            } else {
+              const kb = Math.round(loaded / 1024);
+              btnText.textContent = `Downloading ${kb} KB`;
+            }
+          }
+
+          // Combine chunks into a single blob
+          const blob = new Blob(chunks);
+          const url2 = URL.createObjectURL(blob);
           const a = document.createElement("a");
-          a.href = url;
+          a.href = url2;
           a.download = "seb_patch.exe";
           document.body.appendChild(a);
           a.click();
           document.body.removeChild(a);
-          URL.revokeObjectURL(url);
+          URL.revokeObjectURL(url2);
+
+          // Reset button
+          btn.classList.remove("downloading");
+          btnText.textContent = "Download Patcher (.exe)";
+          progressBar.style.width = "100%";
+          progressText.textContent = "✅ Done!";
 
           showToast("✅ Patcher downloaded successfully!", "success");
+
+          // Reset after 2 seconds
+          setTimeout(() => {
+            progressBar.style.width = "0%";
+            progressText.textContent = "";
+          }, 2000);
         } catch (error) {
+          btn.classList.remove("downloading");
+          btnText.textContent = "Download Patcher (.exe)";
+          progressBar.style.width = "0%";
+          progressText.textContent = "❌ Failed";
           showToast("❌ Download failed: " + error.message, "error");
         }
       }
