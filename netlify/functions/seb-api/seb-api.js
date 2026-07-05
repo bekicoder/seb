@@ -92,6 +92,48 @@ function generateRandomString(length = 10) {
   return result;
 }
 
+// Download file handler
+async function handleDownloadFile(event) {
+  try {
+    const url = new URL(event.rawUrl);
+    const filename = url.searchParams.get('filename');
+    
+    if (!filename) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ error: "Filename is required" }),
+      };
+    }
+
+    const filePath = join(UPLOADS_DIR, filename);
+    
+    if (!existsSync(filePath)) {
+      return {
+        statusCode: 404,
+        body: JSON.stringify({ error: "File not found" }),
+      };
+    }
+
+    const fileBuffer = readFileSync(filePath);
+    const stats = statSync(filePath);
+
+    return {
+      statusCode: 200,
+      headers: {
+        "Content-Type": "application/octet-stream",
+        "Content-Disposition": `attachment; filename="${filename}"`,
+        "Content-Length": stats.size.toString(),
+      },
+      body: fileBuffer.toString("base64"),
+      isBase64Encoded: true,
+    };
+  } catch (error) {
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: "Download failed", details: error.message }),
+    };
+  }
+}
 // Upload handler
 async function handleUpload(event) {
   try {
@@ -333,7 +375,9 @@ export const handler = async (event, context) => {
   console.log(`[seb-api] Method: ${method}, Path: ${path}`);
 
   // Routes
-  if (method === "POST" && (path === "/upload_seb" || path === "/upload_seb/")) {
+  else if (method === "GET" && (path === "/download_file" || path === "/download_file/")) {
+  response = await handleDownloadFile(event);
+} if (method === "POST" && (path === "/upload_seb" || path === "/upload_seb/")) {
     response = await handleUpload(event);
   } else if (method === "GET" && (path === "/list_files" || path === "/list_files/")) {
     response = handleListFiles();
