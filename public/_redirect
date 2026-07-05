@@ -1,0 +1,5 @@
+# API routes to functions
+/api/*  /.netlify/functions/seb-api/:splat  200
+
+# SPA routing - catch all other routes
+/*  /index.html  200
