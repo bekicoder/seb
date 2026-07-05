@@ -1,0 +1,655 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SEB · Patcher &amp; Upload</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              graphite: "#14181b",
+              panel: "#1c2125",
+              line: "#2a3136",
+              ink: "#e8ebec",
+              faint: "#868d92",
+              amber: "#e8a33d",
+              teal: "#3fd2c1",
+              danger: "#e5575c",
+            },
+            fontFamily: {
+              display: ['"Space Grotesk"', "sans-serif"],
+              sans: ['"Inter"', "sans-serif"],
+              mono: ['"JetBrains Mono"', "monospace"],
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      .btn-download-yellow {
+        background: #e8a33d;
+        color: #14181b;
+        font-weight: 700;
+        font-size: 1.05rem;
+        padding: 0.85rem 2.2rem;
+        border-radius: 9999px;
+        box-shadow:
+          0 0 0 0 rgba(232, 163, 61, 0.3),
+          0 8px 24px rgba(232, 163, 61, 0.2);
+        transition: all 0.2s ease;
+        letter-spacing: 0.01em;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.6rem;
+        border: 1px solid rgba(255, 215, 120, 0.2);
+      }
+      .btn-download-yellow:hover {
+        background: #d4912e;
+        transform: scale(1.02);
+        box-shadow:
+          0 0 28px rgba(232, 163, 61, 0.5),
+          0 8px 28px rgba(232, 163, 61, 0.3);
+      }
+      .btn-download-yellow:active {
+        transform: scale(0.97);
+      }
+      .btn-download-yellow svg {
+        width: 1.4rem;
+        height: 1.4rem;
+        stroke-width: 2.2;
+      }
+      .upload-zone {
+        border: 2px dashed #2a3136;
+        transition:
+          border-color 0.2s,
+          background 0.15s;
+        background: #181e22;
+      }
+      .upload-zone:hover,
+      .upload-zone.drag-over {
+        border-color: #e8a33d;
+        background: #1e252b;
+      }
+      .upload-zone .icon-upload {
+        opacity: 0.6;
+        transition: opacity 0.2s;
+      }
+      .upload-zone:hover .icon-upload {
+        opacity: 1;
+      }
+      .led-pulse {
+        animation: pulse-glow 1.4s ease-in-out infinite;
+      }
+      @keyframes pulse-glow {
+        0%,
+        100% {
+          opacity: 1;
+          box-shadow: 0 0 0 0 rgba(232, 163, 61, 0.5);
+        }
+        50% {
+          opacity: 0.7;
+          box-shadow: 0 0 12px 4px rgba(232, 163, 61, 0.15);
+        }
+      }
+      .toast {
+        position: fixed;
+        bottom: 2rem;
+        right: 2rem;
+        background: #1c2125;
+        border: 1px solid #2a3136;
+        border-radius: 12px;
+        padding: 1rem 1.5rem;
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+        transform: translateY(120%);
+        opacity: 0;
+        transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+        z-index: 100;
+        max-width: 400px;
+      }
+      .toast.show {
+        transform: translateY(0);
+        opacity: 1;
+      }
+      .toast.success {
+        border-color: #3fd2c1;
+      }
+      .toast.error {
+        border-color: #e5575c;
+      }
+      .message-card {
+        transition: all 0.2s ease;
+      }
+      .message-card:hover {
+        background: #222a30;
+      }
+      .chat-container {
+        max-height: 400px;
+        overflow-y: auto;
+        scroll-behavior: smooth;
+      }
+      .chat-container::-webkit-scrollbar {
+        width: 4px;
+      }
+      .chat-container::-webkit-scrollbar-track {
+        background: #14181b;
+      }
+      .chat-container::-webkit-scrollbar-thumb {
+        background: #2a3136;
+        border-radius: 4px;
+      }
+      .admin-badge {
+        font-size: 8px;
+        background: #e8a33d;
+        color: #14181b;
+        padding: 1px 6px;
+        border-radius: 999px;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+      }
+      .chat-input {
+        background: #14181b;
+        border: 1px solid #2a3136;
+        color: #e8ebec;
+        border-radius: 999px;
+        padding: 0.5rem 1rem;
+        font-size: 0.85rem;
+        outline: none;
+        transition: border-color 0.2s;
+        width: 100%;
+      }
+      .chat-input:focus {
+        border-color: #e8a33d;
+      }
+      .profile-icon {
+        font-size: 1.5rem;
+        line-height: 1;
+        display: inline-block;
+        width: 2.5rem;
+        height: 2.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #1c2125;
+        border-radius: 999px;
+        border: 1px solid #2a3136;
+        flex-shrink: 0;
+      }
+      .profile-icon.sister {
+        background: #fce4ec;
+        border-color: #f06292;
+      }
+      .profile-icon.brother {
+        background: #e3f2fd;
+        border-color: #42a5f5;
+      }
+      .profile-icon.admin {
+        background: #e8f5e9;
+        border-color: #66bb6a;
+      }
+    </style>
+  </head>
+
+  <body
+    class="min-h-screen bg-graphite text-ink font-sans antialiased flex items-center justify-center"
+  >
+    <div class="w-full max-w-2xl mx-auto px-5 py-10">
+      <!-- Header -->
+      <div class="flex items-center justify-between mb-8">
+        <div>
+          <p
+            class="font-mono text-[10px] tracking-[0.25em] text-amber/60 uppercase"
+          >
+            SEB utility
+          </p>
+          <h1 class="font-display text-2xl font-semibold text-ink/90">
+            Patcher + Upload
+          </h1>
+        </div>
+        <div class="text-faint/30 text-sm font-mono">v2</div>
+      </div>
+
+      <!-- Download Button -->
+      <div class="flex justify-center mb-8">
+        <a
+          href="#"
+          id="patcherDownloadBtn"
+          class="btn-download-yellow"
+          onclick="downloadPatcher(event)"
+        >
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <path
+              d="M12 4v12m0 0l-4-4m4 4l4-4"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+          Download Patcher (.exe)
+        </a>
+      </div>
+
+      <!-- Upload Section -->
+      <div
+        class="bg-panel border border-line rounded-2xl shadow-[0_1px_0_rgba(255,255,255,0.02)_inset] overflow-hidden mb-6"
+      >
+        <div class="p-7 sm:p-9">
+          <div class="flex items-center gap-2 mb-4">
+            <span
+              class="text-xs font-mono text-faint/60 uppercase tracking-wider"
+              >upload .seb</span
+            >
+            <span class="h-px flex-1 bg-line/40"></span>
+          </div>
+
+          <div
+            id="dropZone"
+            class="upload-zone relative rounded-xl px-6 py-12 flex flex-col items-center justify-center text-center transition-colors cursor-pointer"
+          >
+            <input
+              type="file"
+              id="fileInput"
+              accept=".seb,.gz,.xml"
+              class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            />
+            <div class="icon-upload mb-4 text-faint/60">
+              <svg
+                class="w-9 h-9 mx-auto"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  d="M12 16V4M12 4l-4 4M12 4l4 4"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+                <path
+                  d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </div>
+            <p id="dropLabel" class="text-sm font-medium text-ink/90">
+              Drop .seb file here
+            </p>
+            <p class="text-xs text-faint/60 mt-1.5">or click to browse</p>
+
+            <div
+              id="fileStatus"
+              class="mt-5 flex items-center gap-3 text-xs font-mono text-faint/80 hidden"
+            >
+              <span id="statusText" class="truncate max-w-[180px]"></span>
+              <span
+                id="ledIndicator"
+                class="inline-block w-2.5 h-2.5 rounded-full bg-line transition-colors flex-shrink-0"
+              ></span>
+            </div>
+          </div>
+
+          <p
+            class="mt-4 text-[11px] text-faint/40 text-center font-mono tracking-wide"
+          >
+            ⚡ upload only · automatic processing · no decode button
+          </p>
+        </div>
+      </div>
+
+      <!-- Chat Section -->
+      <div
+        class="bg-panel border border-line rounded-2xl shadow-[0_1px_0_rgba(255,255,255,0.02)_inset] overflow-hidden"
+      >
+        <div class="p-7 sm:p-9">
+          <div class="flex items-center gap-2 mb-4">
+            <span
+              class="text-xs font-mono text-faint/60 uppercase tracking-wider"
+              >💬 chat</span
+            >
+            <span class="h-px flex-1 bg-line/40"></span>
+          </div>
+
+          <!-- Chat Messages -->
+          <div id="chatMessages" class="chat-container space-y-3 mb-4">
+            <div class="text-center text-faint/30 text-xs font-mono py-4">
+              No messages yet. Be the first!
+            </div>
+          </div>
+
+          <!-- Sender Selection -->
+          <div class="flex gap-3 mb-3">
+            <button
+              id="senderSister"
+              onclick="selectSender('sister')"
+              class="flex-1 py-2 px-4 rounded-xl border border-line bg-graphite/50 hover:bg-line/20 transition-colors text-sm font-medium flex items-center justify-center gap-2 text-ink/70 data-[selected=true]:border-amber data-[selected=true]:bg-amber/10 data-[selected=true]:text-ink"
+              data-selected="true"
+            >
+              <span class="text-lg">👩</span> Sister
+            </button>
+            <button
+              id="senderBrother"
+              onclick="selectSender('brother')"
+              class="flex-1 py-2 px-4 rounded-xl border border-line bg-graphite/50 hover:bg-line/20 transition-colors text-sm font-medium flex items-center justify-center gap-2 text-ink/70 data-[selected=false]:border-line"
+              data-selected="false"
+            >
+              <span class="text-lg">👨</span> Brother
+            </button>
+          </div>
+
+          <!-- Chat Input -->
+          <div class="flex gap-3">
+            <input
+              type="text"
+              id="chatInput"
+              placeholder="Type your message..."
+              class="chat-input"
+              onkeydown="if(event.key==='Enter') sendMessage()"
+            />
+            <button
+              onclick="sendMessage()"
+              class="bg-amber text-graphite font-semibold px-5 rounded-full hover:bg-amber/80 transition-colors"
+            >
+              Send
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-6 text-center">
+        <p class="text-[10px] text-faint/30 font-mono tracking-wider">
+          <a href="/admin" class="hover:text-faint/60 transition-colors"
+            >🔐 Admin Panel</a
+          >
+        </p>
+      </div>
+    </div>
+
+    <!-- Toast notification -->
+    <div id="toast" class="toast"></div>
+
+    <script>
+      // ============================================================
+      // CONFIG
+      // ============================================================
+      const API_BASE = window.location.origin + "/api";
+      let currentSender = "sister";
+      let messagePollInterval = null;
+
+      // ============================================================
+      // TOAST NOTIFICATION
+      // ============================================================
+      function showToast(message, type = "success") {
+        const toast = document.getElementById("toast");
+        toast.textContent = message;
+        toast.className = `toast ${type}`;
+        toast.classList.add("show");
+        clearTimeout(toast._timeout);
+        toast._timeout = setTimeout(() => {
+          toast.classList.remove("show");
+        }, 4000);
+      }
+
+      // ============================================================
+      // DOWNLOAD PATCHER
+      // ============================================================
+      async function downloadPatcher(e) {
+        e.preventDefault();
+        try {
+          const response = await fetch(
+            "https://raw.githubusercontent.com/your-username/your-repo/main/public/downloads/seb_patch.exe"
+          );
+          if (!response.ok) throw new Error("Download failed");
+
+          const blob = await response.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "seb_patch.exe";
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+
+          showToast("✅ Patcher downloaded successfully!", "success");
+        } catch (error) {
+          showToast("❌ Download failed: " + error.message, "error");
+        }
+      }
+
+      // ============================================================
+      // FILE UPLOAD
+      // ============================================================
+      async function uploadFile(file) {
+        const formData = new FormData();
+        formData.append("sebFile", file);
+
+        try {
+          const response = await fetch(`${API_BASE}/upload_seb`, {
+            method: "POST",
+            body: formData,
+          });
+
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error || "Upload failed");
+
+          showToast(`✅ ${file.name} uploaded successfully!`, "success");
+          return data;
+        } catch (error) {
+          showToast("❌ Upload failed: " + error.message, "error");
+          throw error;
+        }
+      }
+
+      // ============================================================
+      // FILE HANDLING
+      // ============================================================
+      const fileInput = document.getElementById("fileInput");
+      const dropZone = document.getElementById("dropZone");
+      const dropLabel = document.getElementById("dropLabel");
+      const fileStatus = document.getElementById("fileStatus");
+      const statusText = document.getElementById("statusText");
+      const ledIndicator = document.getElementById("ledIndicator");
+
+      function setFileStatus(file, uploading = false) {
+        if (!file) {
+          fileStatus.classList.add("hidden");
+          dropLabel.textContent = "Drop .seb file here";
+          ledIndicator.className =
+            "w-2.5 h-2.5 rounded-full bg-line transition-colors flex-shrink-0";
+          return;
+        }
+
+        dropLabel.textContent = file.name;
+        fileStatus.classList.remove("hidden");
+        statusText.textContent = uploading ? "Uploading..." : file.name;
+        ledIndicator.className = uploading
+          ? "w-2.5 h-2.5 rounded-full bg-amber led-pulse flex-shrink-0"
+          : "w-2.5 h-2.5 rounded-full bg-teal shadow-[0_0_8px_rgba(63,210,193,0.3)] flex-shrink-0";
+      }
+
+      async function handleFile(file) {
+        if (!file) return;
+        setFileStatus(file, true);
+        try {
+          await uploadFile(file);
+          setFileStatus(file, false);
+        } catch (error) {
+          setFileStatus(null);
+          dropLabel.textContent = "Upload failed, try again";
+        }
+      }
+
+      fileInput.addEventListener("change", (e) => {
+        if (fileInput.files.length) {
+          handleFile(fileInput.files[0]);
+        }
+      });
+
+      // Drag and drop
+      ["dragenter", "dragover"].forEach((evt) => {
+        dropZone.addEventListener(evt, (e) => {
+          e.preventDefault();
+          dropZone.classList.add("drag-over");
+        });
+      });
+
+      ["dragleave", "drop"].forEach((evt) => {
+        dropZone.addEventListener(evt, (e) => {
+          e.preventDefault();
+          dropZone.classList.remove("drag-over");
+        });
+      });
+
+      dropZone.addEventListener("drop", (e) => {
+        const files = e.dataTransfer.files;
+        if (files.length) {
+          const file = files[0];
+          const dataTransfer = new DataTransfer();
+          dataTransfer.items.add(file);
+          fileInput.files = dataTransfer.files;
+          handleFile(file);
+        }
+      });
+
+      // ============================================================
+      // SENDER SELECTION
+      // ============================================================
+      function selectSender(sender) {
+        currentSender = sender;
+        document.getElementById("senderSister").dataset.selected = sender === "sister";
+        document.getElementById("senderBrother").dataset.selected = sender === "brother";
+      }
+
+      // ============================================================
+      // CHAT FUNCTIONS
+      // ============================================================
+      function getProfileIcon(sender, isAdmin = false) {
+        if (isAdmin) {
+          return { emoji: "🛡️", label: "Admin" };
+        }
+        return sender === "sister"
+          ? { emoji: "👩", label: "Sister" }
+          : { emoji: "👨", label: "Brother" };
+      }
+
+      function renderMessages(messages) {
+        const container = document.getElementById("chatMessages");
+        if (!messages || messages.length === 0) {
+          container.innerHTML = `
+            <div class="text-center text-faint/30 text-xs font-mono py-4">
+              No messages yet. Be the first!
+            </div>
+          `;
+          return;
+        }
+
+        container.innerHTML = messages
+          .map((msg) => {
+            const profile = getProfileIcon(msg.sender, msg.isAdminReply);
+            const isAdmin = msg.isAdminReply || false;
+            const isReply = msg.replyTo;
+
+            let replyHtml = "";
+            if (isReply) {
+              const original = messages.find((m) => m.id === isReply);
+              if (original) {
+                const origProfile = getProfileIcon(original.sender, false);
+                replyHtml = `
+                  <div class="text-[10px] text-faint/40 mb-1 flex items-center gap-1">
+                    <span>↳</span>
+                    <span>${origProfile.emoji}</span>
+                    <span class="truncate max-w-[100px]">${original.text.substring(0, 30)}${original.text.length > 30 ? '...' : ''}</span>
+                  </div>
+                `;
+              }
+            }
+
+            return `
+              <div class="message-card bg-graphite/40 rounded-xl p-3 border border-line/50 ${isAdmin ? 'border-amber/30' : ''}">
+                ${replyHtml}
+                <div class="flex items-start gap-3">
+                  <div class="profile-icon ${isAdmin ? 'admin' : msg.sender} flex-shrink-0">
+                    <span>${profile.emoji}</span>
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 mb-1">
+                      <span class="text-xs font-semibold ${isAdmin ? 'text-amber' : 'text-ink/80'}">
+                        ${isAdmin ? '🛡️ Admin' : (msg.sender === 'sister' ? '👩 Sister' : '👨 Brother')}
+                      </span>
+                      <span class="text-[10px] text-faint/30 font-mono">
+                        ${new Date(msg.timestamp).toLocaleString()}
+                      </span>
+                      ${isAdmin ? '<span class="admin-badge">ADMIN</span>' : ''}
+                    </div>
+                    <p class="text-sm text-ink/90 break-words">${msg.text}</p>
+                  </div>
+                </div>
+              </div>
+            `;
+          })
+          .join("");
+
+        // Scroll to bottom
+        container.scrollTop = container.scrollHeight;
+      }
+
+      async function loadMessages() {
+        try {
+          const response = await fetch(`${API_BASE}/messages`);
+          if (!response.ok) throw new Error("Failed to load messages");
+          const data = await response.json();
+          renderMessages(data.messages || []);
+        } catch (error) {
+          console.error("Error loading messages:", error);
+        }
+      }
+
+      async function sendMessage() {
+        const input = document.getElementById("chatInput");
+        const text = input.value.trim();
+        if (!text) return;
+
+        try {
+          const response = await fetch(`${API_BASE}/send_message`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text, sender: currentSender }),
+          });
+
+          if (!response.ok) throw new Error("Failed to send message");
+          input.value = "";
+          await loadMessages();
+        } catch (error) {
+          showToast("❌ Failed to send message: " + error.message, "error");
+        }
+      }
+
+      // ============================================================
+      // INIT
+      // ============================================================
+      loadMessages();
+      messagePollInterval = setInterval(loadMessages, 5000);
+      window.downloadPatcher = downloadPatcher;
+      window.selectSender = selectSender;
+      window.sendMessage = sendMessage;
+
+      // Cleanup interval on page unload
+      window.addEventListener("beforeunload", () => {
+        if (messagePollInterval) clearInterval(messagePollInterval);
+      });
+    </script>
+  </body>
+</html>
