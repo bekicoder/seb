@@ -1,18 +1,17 @@
-# netlify.toml
 [build]
   functions = "netlify/functions"
-  publish = "."
-
-[functions]
-  node_bundler = "esbuild"
 
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/seb-api/:splat"
   status = 200
-  force = true
 
 [[redirects]]
-  from = "/*"
-  to = "/index.html"
+  from = "/admin"
+  to = "/admin/index.html"
   status = 200
+
+[[headers]]
+  for = "/downloads/*"
+  [headers.values]
+    Content-Type = "application/octet-stream"
