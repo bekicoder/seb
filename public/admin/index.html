@@ -1,0 +1,509 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SEB · Admin Panel</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              graphite: "#14181b",
+              panel: "#1c2125",
+              line: "#2a3136",
+              ink: "#e8ebec",
+              faint: "#868d92",
+              amber: "#e8a33d",
+              teal: "#3fd2c1",
+              danger: "#e5575c",
+            },
+            fontFamily: {
+              display: ['"Space Grotesk"', "sans-serif"],
+              sans: ['"Inter"', "sans-serif"],
+              mono: ['"JetBrains Mono"', "monospace"],
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      .chat-container {
+        max-height: 500px;
+        overflow-y: auto;
+        scroll-behavior: smooth;
+      }
+      .chat-container::-webkit-scrollbar {
+        width: 4px;
+      }
+      .chat-container::-webkit-scrollbar-track {
+        background: #14181b;
+      }
+      .chat-container::-webkit-scrollbar-thumb {
+        background: #2a3136;
+        border-radius: 4px;
+      }
+      .admin-badge {
+        font-size: 8px;
+        background: #e8a33d;
+        color: #14181b;
+        padding: 1px 6px;
+        border-radius: 999px;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+      }
+      .profile-icon {
+        font-size: 1.5rem;
+        line-height: 1;
+        display: inline-block;
+        width: 2.5rem;
+        height: 2.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #1c2125;
+        border-radius: 999px;
+        border: 1px solid #2a3136;
+        flex-shrink: 0;
+      }
+      .profile-icon.sister {
+        background: #fce4ec;
+        border-color: #f06292;
+      }
+      .profile-icon.brother {
+        background: #e3f2fd;
+        border-color: #42a5f5;
+      }
+      .profile-icon.admin {
+        background: #e8f5e9;
+        border-color: #66bb6a;
+      }
+      .message-card {
+        transition: all 0.2s ease;
+      }
+      .message-card:hover {
+        background: #222a30;
+      }
+      .toast {
+        position: fixed;
+        bottom: 2rem;
+        right: 2rem;
+        background: #1c2125;
+        border: 1px solid #2a3136;
+        border-radius: 12px;
+        padding: 1rem 1.5rem;
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+        transform: translateY(120%);
+        opacity: 0;
+        transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+        z-index: 100;
+        max-width: 400px;
+      }
+      .toast.show {
+        transform: translateY(0);
+        opacity: 1;
+      }
+      .toast.success {
+        border-color: #3fd2c1;
+      }
+      .toast.error {
+        border-color: #e5575c;
+      }
+      .reply-btn {
+        font-size: 11px;
+        background: #2a3136;
+        padding: 2px 12px;
+        border-radius: 999px;
+        color: #868d92;
+        transition: all 0.15s;
+        cursor: pointer;
+        border: none;
+      }
+      .reply-btn:hover {
+        background: #e8a33d;
+        color: #14181b;
+      }
+      .admin-reply-input {
+        background: #14181b;
+        border: 1px solid #2a3136;
+        color: #e8ebec;
+        border-radius: 999px;
+        padding: 0.4rem 1rem;
+        font-size: 0.85rem;
+        outline: none;
+        transition: border-color 0.2s;
+        width: 100%;
+      }
+      .admin-reply-input:focus {
+        border-color: #e8a33d;
+      }
+    </style>
+  </head>
+
+  <body
+    class="min-h-screen bg-graphite text-ink font-sans antialiased p-6"
+  >
+    <div class="max-w-4xl mx-auto">
+      <!-- Header -->
+      <div class="flex items-center justify-between mb-8">
+        <div>
+          <p
+            class="font-mono text-[10px] tracking-[0.25em] text-amber/60 uppercase"
+          >
+            Admin
+          </p>
+          <h1 class="font-display text-2xl font-semibold text-ink/90">
+            🔐 SEB Admin Panel
+          </h1>
+        </div>
+        <div class="flex items-center gap-4">
+          <span class="text-faint/30 text-sm font-mono">
+            👥 <span id="messageCount">0</span> messages
+          </span>
+          <a
+            href="/"
+            class="text-[11px] text-faint/40 hover:text-faint/80 transition-colors font-mono"
+          >
+            ← Back to site
+          </a>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="flex gap-2 mb-6">
+        <button
+          id="tabChat"
+          onclick="switchTab('chat')"
+          class="px-5 py-2 rounded-xl border border-line bg-line/10 text-ink/80 hover:bg-line/20 transition-colors text-sm font-medium data-[active=true]:border-amber data-[active=true]:bg-amber/10 data-[active=true]:text-ink"
+          data-active="true"
+        >
+          💬 Messages
+        </button>
+        <button
+          id="tabFiles"
+          onclick="switchTab('files')"
+          class="px-5 py-2 rounded-xl border border-line bg-line/10 text-ink/80 hover:bg-line/20 transition-colors text-sm font-medium data-[active=false]:border-line"
+          data-active="false"
+        >
+          📁 Uploaded Files
+        </button>
+      </div>
+
+      <!-- Chat Tab -->
+      <div id="tabChatContent">
+        <div
+          class="bg-panel border border-line rounded-2xl shadow-[0_1px_0_rgba(255,255,255,0.02)_inset] overflow-hidden"
+        >
+          <div class="p-6">
+            <div
+              id="chatMessages"
+              class="chat-container space-y-4 mb-4 min-h-[300px]"
+            >
+              <div class="text-center text-faint/30 text-xs font-mono py-8">
+                Loading messages...
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Files Tab -->
+      <div id="tabFilesContent" class="hidden">
+        <div
+          class="bg-panel border border-line rounded-2xl shadow-[0_1px_0_rgba(255,255,255,0.02)_inset] overflow-hidden"
+        >
+          <div class="p-6">
+            <div id="fileList" class="space-y-2">
+              <div class="text-center text-faint/30 text-xs font-mono py-8">
+                Loading files...
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="toast"></div>
+
+    <script>
+      const API_BASE = window.location.origin + "/api";
+      let currentReplyTarget = null;
+      let messagePollInterval = null;
+
+      function showToast(message, type = "success") {
+        const toast = document.getElementById("toast");
+        toast.textContent = message;
+        toast.className = `toast ${type}`;
+        toast.classList.add("show");
+        clearTimeout(toast._timeout);
+        toast._timeout = setTimeout(() => {
+          toast.classList.remove("show");
+        }, 4000);
+      }
+
+      function getProfileIcon(sender, isAdmin = false) {
+        if (isAdmin) return { emoji: "🛡️", label: "Admin" };
+        return sender === "sister"
+          ? { emoji: "👩", label: "Sister" }
+          : { emoji: "👨", label: "Brother" };
+      }
+
+      // ============================================================
+      // RENDER MESSAGES
+      // ============================================================
+      function renderMessages(messages) {
+        const container = document.getElementById("chatMessages");
+        document.getElementById("messageCount").textContent = messages?.length || 0;
+
+        if (!messages || messages.length === 0) {
+          container.innerHTML = `
+            <div class="text-center text-faint/30 text-xs font-mono py-8">
+              No messages yet.
+            </div>
+          `;
+          return;
+        }
+
+        container.innerHTML = messages
+          .map((msg) => {
+            const profile = getProfileIcon(msg.sender, msg.isAdminReply || false);
+            const isAdmin = msg.isAdminReply || false;
+            const isReply = msg.replyTo;
+
+            let replyHtml = "";
+            if (isReply) {
+              const original = messages.find((m) => m.id === isReply);
+              if (original) {
+                const origProfile = getProfileIcon(original.sender, false);
+                replyHtml = `
+                  <div class="text-[10px] text-faint/40 mb-1 flex items-center gap-1">
+                    <span>↳</span>
+                    <span>${origProfile.emoji}</span>
+                    <span class="truncate max-w-[100px]">${original.text.substring(0, 30)}${original.text.length > 30 ? '...' : ''}</span>
+                  </div>
+                `;
+              }
+            }
+
+            return `
+              <div class="message-card bg-graphite/40 rounded-xl p-3 border ${isAdmin ? 'border-amber/30' : 'border-line/50'}">
+                ${replyHtml}
+                <div class="flex items-start gap-3">
+                  <div class="profile-icon ${isAdmin ? 'admin' : msg.sender} flex-shrink-0">
+                    <span>${profile.emoji}</span>
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 mb-1 flex-wrap">
+                      <span class="text-xs font-semibold ${isAdmin ? 'text-amber' : 'text-ink/80'}">
+                        ${isAdmin ? '🛡️ Admin' : (msg.sender === 'sister' ? '👩 Sister' : '👨 Brother')}
+                      </span>
+                      <span class="text-[10px] text-faint/30 font-mono">
+                        ${new Date(msg.timestamp).toLocaleString()}
+                      </span>
+                      ${isAdmin ? '<span class="admin-badge">ADMIN</span>' : ''}
+                      ${msg.replied ? '<span class="text-[10px] text-teal/50 font-mono">✓ replied</span>' : ''}
+                    </div>
+                    <p class="text-sm text-ink/90 break-words">${msg.text}</p>
+                    ${!isAdmin && !msg.replied ? `
+                      <button
+                        onclick="startReply('${msg.id}')"
+                        class="reply-btn mt-2"
+                      >
+                        ↳ Reply
+                      </button>
+                    ` : ''}
+                  </div>
+                </div>
+              </div>
+            `;
+          })
+          .join("");
+
+        // Scroll to bottom
+        container.scrollTop = container.scrollHeight;
+      }
+
+      // ============================================================
+      // START REPLY
+      // ============================================================
+      function startReply(messageId) {
+        currentReplyTarget = messageId;
+        const container = document.getElementById("chatMessages");
+
+        // Remove existing reply input if any
+        const existing = document.querySelector(".admin-reply-wrapper");
+        if (existing) existing.remove();
+
+        const wrapper = document.createElement("div");
+        wrapper.className = "admin-reply-wrapper mt-3 p-3 bg-line/10 rounded-xl";
+
+        // Find the message being replied to
+        const messages = JSON.parse(localStorage.getItem("_seb_messages") || "[]");
+        const targetMsg = messages.find((m) => m.id === messageId);
+        const profile = targetMsg ? getProfileIcon(targetMsg.sender, false) : { emoji: "👤" };
+
+        wrapper.innerHTML = `
+          <div class="flex items-center gap-2 mb-2 text-xs text-faint/60">
+            <span>↳ Replying to ${profile.emoji}</span>
+            <button onclick="cancelReply()" class="text-faint/30 hover:text-danger/70 transition-colors">✕</button>
+          </div>
+          <div class="flex gap-2">
+            <select id="adminSenderSelect" class="bg-graphite border border-line rounded-lg px-3 py-2 text-sm text-ink/80 outline-none">
+              <option value="sister">👩 Sister</option>
+              <option value="brother">👨 Brother</option>
+            </select>
+            <input
+              type="text"
+              id="adminReplyInput"
+              placeholder="Type your reply..."
+              class="admin-reply-input flex-1"
+              onkeydown="if(event.key==='Enter') sendReply()"
+            />
+            <button
+              onclick="sendReply()"
+              class="bg-amber text-graphite font-semibold px-5 rounded-full hover:bg-amber/80 transition-colors text-sm"
+            >
+              Send
+            </button>
+          </div>
+        `;
+
+        container.appendChild(wrapper);
+        document.getElementById("adminReplyInput").focus();
+      }
+
+      function cancelReply() {
+        const wrapper = document.querySelector(".admin-reply-wrapper");
+        if (wrapper) wrapper.remove();
+        currentReplyTarget = null;
+      }
+
+      // ============================================================
+      // SEND REPLY
+      // ============================================================
+      async function sendReply() {
+        const input = document.getElementById("adminReplyInput");
+        const text = input.value.trim();
+        if (!text || !currentReplyTarget) return;
+
+        const sender = document.getElementById("adminSenderSelect").value;
+
+        try {
+          const response = await fetch(`${API_BASE}/admin_reply`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              messageId: currentReplyTarget,
+              replyText: text,
+              sender: sender,
+            }),
+          });
+
+          if (!response.ok) throw new Error("Failed to send reply");
+          showToast("✅ Reply sent successfully!", "success");
+          cancelReply();
+          await loadMessages();
+        } catch (error) {
+          showToast("❌ Failed to send reply: " + error.message, "error");
+        }
+      }
+
+      // ============================================================
+      // LOAD MESSAGES
+      // ============================================================
+      async function loadMessages() {
+        try {
+          const response = await fetch(`${API_BASE}/messages`);
+          if (!response.ok) throw new Error("Failed to load messages");
+          const data = await response.json();
+          localStorage.setItem("_seb_messages", JSON.stringify(data.messages || []));
+          renderMessages(data.messages || []);
+        } catch (error) {
+          console.error("Error loading messages:", error);
+        }
+      }
+
+      // ============================================================
+      // LOAD FILES
+      // ============================================================
+      async function loadFiles() {
+        try {
+          const response = await fetch(`${API_BASE}/list_files`);
+          if (!response.ok) throw new Error("Failed to load files");
+          const data = await response.json();
+
+          const container = document.getElementById("fileList");
+          if (!data.files || data.files.length === 0) {
+            container.innerHTML = `
+              <div class="text-center text-faint/30 text-xs font-mono py-8">
+                No files uploaded yet.
+              </div>
+            `;
+            return;
+          }
+
+          container.innerHTML = `
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="text-left text-faint/50 border-b border-line/50">
+                    <th class="pb-2 font-mono text-[10px] uppercase tracking-wider">Filename</th>
+                    <th class="pb-2 font-mono text-[10px] uppercase tracking-wider">Size</th>
+                    <th class="pb-2 font-mono text-[10px] uppercase tracking-wider">Uploaded</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${data.files.map((file) => `
+                    <tr class="border-b border-line/20 hover:bg-line/5 transition-colors">
+                      <td class="py-2 font-mono text-[12px] text-faint/80">${file.name}</td>
+                      <td class="py-2 text-faint/60">${(file.size / 1024).toFixed(1)} KB</td>
+                      <td class="py-2 text-faint/40 text-[11px]">${new Date(file.timestamp).toLocaleString()}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          `;
+
+        } catch (error) {
+          console.error("Error loading files:", error);
+        }
+      }
+
+      // ============================================================
+      // SWITCH TABS
+      // ============================================================
+      function switchTab(tab) {
+        document.getElementById("tabChat").dataset.active = tab === "chat";
+        document.getElementById("tabFiles").dataset.active = tab === "files";
+        document.getElementById("tabChatContent").classList.toggle("hidden", tab !== "chat");
+        document.getElementById("tabFilesContent").classList.toggle("hidden", tab !== "files");
+
+        if (tab === "files") loadFiles();
+      }
+
+      // ============================================================
+      // INIT
+      // ============================================================
+      loadMessages();
+      messagePollInterval = setInterval(loadMessages, 5000);
+
+      window.switchTab = switchTab;
+      window.startReply = startReply;
+      window.cancelReply = cancelReply;
+      window.sendReply = sendReply;
+
+      window.addEventListener("beforeunload", () => {
+        if (messagePollInterval) clearInterval(messagePollInterval);
+      });
+    </script>
+  </body>
+</html>
