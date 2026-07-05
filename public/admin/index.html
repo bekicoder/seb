@@ -36,7 +36,7 @@
     </script>
     <style>
       .chat-container {
-        max-height: 500px;
+        max-height: 450px;
         overflow-y: auto;
         scroll-behavior: smooth;
       }
@@ -144,6 +144,23 @@
       .admin-reply-input:focus {
         border-color: #e8a33d;
       }
+      .download-btn {
+        font-size: 11px;
+        background: #1a2a2e;
+        padding: 2px 12px;
+        border-radius: 999px;
+        color: #3fd2c1;
+        transition: all 0.15s;
+        cursor: pointer;
+        border: 1px solid #2a3136;
+        text-decoration: none;
+        display: inline-block;
+      }
+      .download-btn:hover {
+        background: #3fd2c1;
+        color: #14181b;
+        border-color: #3fd2c1;
+      }
     </style>
   </head>
 
@@ -202,12 +219,66 @@
           class="bg-panel border border-line rounded-2xl shadow-[0_1px_0_rgba(255,255,255,0.02)_inset] overflow-hidden"
         >
           <div class="p-6">
+            <!-- Chat Messages -->
             <div
               id="chatMessages"
               class="chat-container space-y-4 mb-4 min-h-[300px]"
             >
               <div class="text-center text-faint/30 text-xs font-mono py-8">
                 Loading messages...
+              </div>
+            </div>
+
+            <!-- Admin Reply Wrapper (hidden by default) -->
+            <div id="adminReplyWrapper" class="hidden mt-3 p-3 bg-line/10 rounded-xl">
+              <div class="flex items-center gap-2 mb-2 text-xs text-faint/60">
+                <span id="replyLabel">↳ Replying to</span>
+                <button onclick="cancelReply()" class="text-faint/30 hover:text-danger/70 transition-colors">✕</button>
+              </div>
+              <div class="flex gap-2">
+                <select id="adminSenderSelect" class="bg-graphite border border-line rounded-lg px-3 py-2 text-sm text-ink/80 outline-none">
+                  <option value="sister">👩 Sister</option>
+                  <option value="brother">👨 Brother</option>
+                </select>
+                <input
+                  type="text"
+                  id="adminReplyInput"
+                  placeholder="Type your reply..."
+                  class="admin-reply-input flex-1"
+                  onkeydown="if(event.key==='Enter') sendReply()"
+                />
+                <button
+                  onclick="sendReply()"
+                  class="bg-amber text-graphite font-semibold px-5 rounded-full hover:bg-amber/80 transition-colors text-sm"
+                >
+                  Send
+                </button>
+              </div>
+            </div>
+
+            <!-- General Message Input -->
+            <div class="mt-4 pt-4 border-t border-line/50">
+              <div class="flex items-center gap-2 mb-2 text-xs text-faint/60">
+                <span>📨 Send general message to all</span>
+              </div>
+              <div class="flex gap-2">
+                <select id="adminGeneralSender" class="bg-graphite border border-line rounded-lg px-3 py-2 text-sm text-ink/80 outline-none">
+                  <option value="sister">👩 Sister</option>
+                  <option value="brother">👨 Brother</option>
+                </select>
+                <input
+                  type="text"
+                  id="adminGeneralInput"
+                  placeholder="Type your message..."
+                  class="admin-reply-input flex-1"
+                  onkeydown="if(event.key==='Enter') sendGeneralMessage()"
+                />
+                <button
+                  onclick="sendGeneralMessage()"
+                  class="bg-amber text-graphite font-semibold px-5 rounded-full hover:bg-amber/80 transition-colors text-sm"
+                >
+                  Send
+                </button>
               </div>
             </div>
           </div>
@@ -236,6 +307,7 @@
     <script>
       const API_BASE = window.location.origin + "/api";
       let currentReplyTarget = null;
+      let currentReplySender = null;
       let messagePollInterval = null;
 
       function showToast(message, type = "success") {
@@ -314,7 +386,7 @@
                     <p class="text-sm text-ink/90 break-words">${msg.text}</p>
                     ${!isAdmin && !msg.replied ? `
                       <button
-                        onclick="startReply('${msg.id}')"
+                        onclick="startReply('${msg.id}', '${msg.sender}')"
                         class="reply-btn mt-2"
                       >
                         ↳ Reply
@@ -334,56 +406,25 @@
       // ============================================================
       // START REPLY
       // ============================================================
-      function startReply(messageId) {
+      function startReply(messageId, sender) {
         currentReplyTarget = messageId;
-        const container = document.getElementById("chatMessages");
+        currentReplySender = sender;
 
-        // Remove existing reply input if any
-        const existing = document.querySelector(".admin-reply-wrapper");
-        if (existing) existing.remove();
+        const wrapper = document.getElementById("adminReplyWrapper");
+        wrapper.classList.remove("hidden");
 
-        const wrapper = document.createElement("div");
-        wrapper.className = "admin-reply-wrapper mt-3 p-3 bg-line/10 rounded-xl";
+        const profile = getProfileIcon(sender, false);
+        document.getElementById("replyLabel").textContent = `↳ Replying to ${profile.emoji} ${profile.label}`;
 
-        // Find the message being replied to
-        const messages = JSON.parse(localStorage.getItem("_seb_messages") || "[]");
-        const targetMsg = messages.find((m) => m.id === messageId);
-        const profile = targetMsg ? getProfileIcon(targetMsg.sender, false) : { emoji: "👤" };
-
-        wrapper.innerHTML = `
-          <div class="flex items-center gap-2 mb-2 text-xs text-faint/60">
-            <span>↳ Replying to ${profile.emoji}</span>
-            <button onclick="cancelReply()" class="text-faint/30 hover:text-danger/70 transition-colors">✕</button>
-          </div>
-          <div class="flex gap-2">
-            <select id="adminSenderSelect" class="bg-graphite border border-line rounded-lg px-3 py-2 text-sm text-ink/80 outline-none">
-              <option value="sister">👩 Sister</option>
-              <option value="brother">👨 Brother</option>
-            </select>
-            <input
-              type="text"
-              id="adminReplyInput"
-              placeholder="Type your reply..."
-              class="admin-reply-input flex-1"
-              onkeydown="if(event.key==='Enter') sendReply()"
-            />
-            <button
-              onclick="sendReply()"
-              class="bg-amber text-graphite font-semibold px-5 rounded-full hover:bg-amber/80 transition-colors text-sm"
-            >
-              Send
-            </button>
-          </div>
-        `;
-
-        container.appendChild(wrapper);
         document.getElementById("adminReplyInput").focus();
       }
 
       function cancelReply() {
-        const wrapper = document.querySelector(".admin-reply-wrapper");
-        if (wrapper) wrapper.remove();
+        const wrapper = document.getElementById("adminReplyWrapper");
+        wrapper.classList.add("hidden");
+        document.getElementById("adminReplyInput").value = "";
         currentReplyTarget = null;
+        currentReplySender = null;
       }
 
       // ============================================================
@@ -414,6 +455,41 @@
         } catch (error) {
           showToast("❌ Failed to send reply: " + error.message, "error");
         }
+      }
+
+      // ============================================================
+      // SEND GENERAL MESSAGE
+      // ============================================================
+      async function sendGeneralMessage() {
+        const input = document.getElementById("adminGeneralInput");
+        const text = input.value.trim();
+        if (!text) return;
+
+        const sender = document.getElementById("adminGeneralSender").value;
+
+        try {
+          const response = await fetch(`${API_BASE}/send_message`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text, sender }),
+          });
+
+          if (!response.ok) throw new Error("Failed to send message");
+          showToast("✅ Message sent successfully!", "success");
+          input.value = "";
+          await loadMessages();
+        } catch (error) {
+          showToast("❌ Failed to send message: " + error.message, "error");
+        }
+      }
+
+      // ============================================================
+      // DOWNLOAD FILE
+      // ============================================================
+      function downloadFile(filename) {
+        // Create a download URL for the file
+        const downloadUrl = `${API_BASE}/download_file?filename=${encodeURIComponent(filename)}`;
+        window.open(downloadUrl, '_blank');
       }
 
       // ============================================================
@@ -458,6 +534,7 @@
                     <th class="pb-2 font-mono text-[10px] uppercase tracking-wider">Filename</th>
                     <th class="pb-2 font-mono text-[10px] uppercase tracking-wider">Size</th>
                     <th class="pb-2 font-mono text-[10px] uppercase tracking-wider">Uploaded</th>
+                    <th class="pb-2 font-mono text-[10px] uppercase tracking-wider">Download</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -466,6 +543,14 @@
                       <td class="py-2 font-mono text-[12px] text-faint/80">${file.name}</td>
                       <td class="py-2 text-faint/60">${(file.size / 1024).toFixed(1)} KB</td>
                       <td class="py-2 text-faint/40 text-[11px]">${new Date(file.timestamp).toLocaleString()}</td>
+                      <td class="py-2">
+                        <button
+                          onclick="downloadFile('${file.name}')"
+                          class="download-btn"
+                        >
+                          ⬇ Download
+                        </button>
+                      </td>
                     </tr>
                   `).join('')}
                 </tbody>
@@ -500,6 +585,8 @@
       window.startReply = startReply;
       window.cancelReply = cancelReply;
       window.sendReply = sendReply;
+      window.sendGeneralMessage = sendGeneralMessage;
+      window.downloadFile = downloadFile;
 
       window.addEventListener("beforeunload", () => {
         if (messagePollInterval) clearInterval(messagePollInterval);
