@@ -1,6 +1,6 @@
-// netlify/functions/seb-api/seb-api.js
-import { Buffer } from "buffer";
-import {
+// netlify/functions/seb-api/seb-api.cjs
+const { Buffer } = require("buffer");
+const {
   createReadStream,
   existsSync,
   mkdirSync,
@@ -9,8 +9,8 @@ import {
   statSync,
   readFileSync,
   unlinkSync,
-} from "fs";
-import { join } from "path";
+} = require("fs");
+const { join } = require("path");
 
 // ✅ Use /tmp for uploaded files (writable in Netlify Functions)
 const UPLOADS_DIR = join("/tmp", "uploads");
@@ -134,6 +134,7 @@ async function handleDownloadFile(event) {
     };
   }
 }
+
 // Upload handler
 async function handleUpload(event) {
   try {
@@ -341,8 +342,8 @@ async function handleAdminReply(event) {
   }
 }
 
-// Main handler
-export const handler = async (event, context) => {
+// Main handler - FIXED: Use CommonJS exports
+exports.handler = async (event, context) => {
   let path = event.path || event.rawPath || "";
 
   const functionPath = "/.netlify/functions/seb-api";
@@ -374,10 +375,8 @@ export const handler = async (event, context) => {
 
   console.log(`[seb-api] Method: ${method}, Path: ${path}`);
 
-  // Routes
-  else if (method === "GET" && (path === "/download_file" || path === "/download_file/")) {
-  response = await handleDownloadFile(event);
-} if (method === "POST" && (path === "/upload_seb" || path === "/upload_seb/")) {
+  // FIXED: Correct routing with proper if/else if structure
+  if (method === "POST" && (path === "/upload_seb" || path === "/upload_seb/")) {
     response = await handleUpload(event);
   } else if (method === "GET" && (path === "/list_files" || path === "/list_files/")) {
     response = handleListFiles();
@@ -387,6 +386,8 @@ export const handler = async (event, context) => {
     response = await handleSendMessage(event);
   } else if (method === "POST" && (path === "/admin_reply" || path === "/admin_reply/")) {
     response = await handleAdminReply(event);
+  } else if (method === "GET" && (path === "/download_file" || path === "/download_file/")) {
+    response = await handleDownloadFile(event);
   } else if (path === "/" || path === "") {
     response = {
       statusCode: 200,
@@ -398,6 +399,7 @@ export const handler = async (event, context) => {
           messages: "GET /api/messages",
           send_message: "POST /api/send_message",
           admin_reply: "POST /api/admin_reply",
+          download_file: "GET /api/download_file?filename=example.seb",
         },
       }),
     };
