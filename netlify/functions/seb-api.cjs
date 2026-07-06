@@ -12,6 +12,7 @@ const { join } = require("path");
 
 const UPLOADS_DIR = join("/tmp", "uploads");
 const MESSAGES_FILE = join("/tmp", "messages.json");
+const NOTIFICATIONS_FILE = join("/tmp", "notifications.json");
 
 // Ensure directories exist
 if (!existsSync(UPLOADS_DIR)) {
@@ -19,6 +20,9 @@ if (!existsSync(UPLOADS_DIR)) {
 }
 if (!existsSync(MESSAGES_FILE)) {
   writeFileSync(MESSAGES_FILE, JSON.stringify([]));
+}
+if (!existsSync(NOTIFICATIONS_FILE)) {
+  writeFileSync(NOTIFICATIONS_FILE, JSON.stringify({ lastNotificationId: 0, notifications: [] }));
 }
 
 function generateRandomString(length = 10) {
@@ -130,15 +134,37 @@ function handleListFiles() {
   }
 }
 
-// Get messages
-function handleGetMessages() {
+// Get messages with notification check
+function handleGetMessages(event) {
   try {
     if (!existsSync(MESSAGES_FILE)) {
-      return { statusCode: 200, body: JSON.stringify({ messages: [] }) };
+      return { statusCode: 200, body: JSON.stringify({ messages: [], lastNotificationId: 0 }) };
     }
     const data = readFileSync(MESSAGES_FILE, 'utf-8');
     const messages = JSON.parse(data);
-    return { statusCode: 200, body: JSON.stringify({ messages }) };
+    
+    // Get the last notification ID from the request
+    const url = new URL(event.rawUrl || `http://localhost${event.path || ''}`);
+    const lastSeen = parseInt(url.searchParams.get('lastSeen') || '0');
+    
+    // Get current notification state
+    let notificationState = { lastNotificationId: 0 };
+    if (existsSync(NOTIFICATIONS_FILE)) {
+      const notifData = readFileSync(NOTIFICATIONS_FILE, 'utf-8');
+      notificationState = JSON.parse(notifData);
+    }
+    
+    // Find new messages since last seen
+    const newMessages = messages.filter(m => parseInt(m.id) > lastSeen);
+    
+    return { 
+      statusCode: 200, 
+      body: JSON.stringify({ 
+        messages, 
+        lastNotificationId: notificationState.lastNotificationId,
+        newMessages: newMessages.length
+      }) 
+    };
   } catch (error) {
     return { statusCode: 500, body: JSON.stringify({ error: "Failed to read messages" }) };
   }
@@ -168,6 +194,25 @@ async function handleSendMessage(event) {
     };
     messages.push(newMessage);
     writeFileSync(MESSAGES_FILE, JSON.stringify(messages, null, 2));
+    
+    // Update notification state
+    let notificationState = { lastNotificationId: 0, notifications: [] };
+    if (existsSync(NOTIFICATIONS_FILE)) {
+      const notifData = readFileSync(NOTIFICATIONS_FILE, 'utf-8');
+      notificationState = JSON.parse(notifData);
+    }
+    notificationState.lastNotificationId = parseInt(newMessage.id);
+    notificationState.notifications.push({
+      id: newMessage.id,
+      sender: sender,
+      text: text.substring(0, 100),
+      timestamp: newMessage.timestamp
+    });
+    // Keep only last 50 notifications
+    if (notificationState.notifications.length > 50) {
+      notificationState.notifications = notificationState.notifications.slice(-50);
+    }
+    writeFileSync(NOTIFICATIONS_FILE, JSON.stringify(notificationState, null, 2));
 
     return { statusCode: 200, body: JSON.stringify({ message: "Message sent", data: newMessage }) };
   } catch (error) {
@@ -206,6 +251,26 @@ async function handleAdminReply(event) {
     messages.push(reply);
     messages[messageIndex].replied = true;
     writeFileSync(MESSAGES_FILE, JSON.stringify(messages, null, 2));
+    
+    // Update notification state for admin reply
+    let notificationState = { lastNotificationId: 0, notifications: [] };
+    if (existsSync(NOTIFICATIONS_FILE)) {
+      const notifData = readFileSync(NOTIFICATIONS_FILE, 'utf-8');
+      notificationState = JSON.parse(notifData);
+    }
+    notificationState.lastNotificationId = parseInt(reply.id);
+    notificationState.notifications.push({
+      id: reply.id,
+      sender: 'admin',
+      text: replyText.substring(0, 100),
+      timestamp: reply.timestamp,
+      isAdminReply: true,
+      replyTo: messageId
+    });
+    if (notificationState.notifications.length > 50) {
+      notificationState.notifications = notificationState.notifications.slice(-50);
+    }
+    writeFileSync(NOTIFICATIONS_FILE, JSON.stringify(notificationState, null, 2));
 
     return { statusCode: 200, body: JSON.stringify({ message: "Reply sent", data: reply }) };
   } catch (error) {
@@ -274,7 +339,7 @@ exports.handler = async (event, context) => {
   } else if (method === "GET" && path === "/list_files") {
     response = handleListFiles();
   } else if (method === "GET" && path === "/messages") {
-    response = handleGetMessages();
+    response = handleGetMessages(event);
   } else if (method === "POST" && path === "/send_message") {
     response = await handleSendMessage(event);
   } else if (method === "POST" && path === "/admin_reply") {
