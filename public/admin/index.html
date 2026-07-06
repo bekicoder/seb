@@ -161,6 +161,34 @@
         color: #14181b;
         border-color: #3fd2c1;
       }
+      .notif-banner {
+        background: #1c2125;
+        border: 1px solid #2a3136;
+        border-radius: 12px;
+        padding: 0.75rem 1rem;
+        margin-bottom: 1rem;
+        display: none;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 0.875rem;
+      }
+      .notif-banner.show {
+        display: flex;
+      }
+      .notif-banner .btn-enable {
+        background: #e8a33d;
+        color: #14181b;
+        padding: 0.25rem 1rem;
+        border-radius: 999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        cursor: pointer;
+        border: none;
+        transition: background 0.2s;
+      }
+      .notif-banner .btn-enable:hover {
+        background: #d6952a;
+      }
     </style>
   </head>
 
@@ -191,6 +219,12 @@
             ← Back to site
           </a>
         </div>
+      </div>
+
+      <!-- Notification Banner -->
+      <div id="notifBanner" class="notif-banner">
+        <span>🔔 Enable notifications for new messages</span>
+        <button class="btn-enable" onclick="requestNotificationPermission()">Enable</button>
       </div>
 
       <!-- Tabs -->
@@ -309,7 +343,69 @@
       let currentReplyTarget = null;
       let currentReplySender = null;
       let messagePollInterval = null;
+      let lastSeenId = 0;
+      let notificationPermission = false;
 
+      // ============================================================
+      // NOTIFICATIONS
+      // ============================================================
+      function requestNotificationPermission() {
+        if (!("Notification" in window)) {
+          showToast("❌ This browser doesn't support notifications", "error");
+          return;
+        }
+
+        Notification.requestPermission().then((permission) => {
+          if (permission === "granted") {
+            notificationPermission = true;
+            document.getElementById("notifBanner").classList.remove("show");
+            showToast("✅ Notifications enabled!", "success");
+            sendBrowserNotification("🔔 Notifications active", "You'll receive alerts for new messages");
+          } else {
+            showToast("❌ Notification permission denied", "error");
+          }
+        });
+      }
+
+      function sendBrowserNotification(title, body) {
+        if (!("Notification" in window) || Notification.permission !== "granted") {
+          return;
+        }
+
+        try {
+          const options = {
+            body: body,
+            icon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48'%3E%3Ctext y='36' font-size='36'%3E💬%3C/text%3E%3C/svg%3E",
+            badge: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48'%3E%3Ctext y='36' font-size='36'%3E💬%3C/text%3E%3C/svg%3E",
+            tag: "seb-admin-message",
+            requireInteraction: true,
+            silent: false,
+          };
+
+          const notification = new Notification(title, options);
+          setTimeout(() => notification.close(), 10000);
+          
+          notification.onclick = function() {
+            window.focus();
+            this.close();
+          };
+        } catch (error) {
+          console.log("Notification error:", error);
+        }
+      }
+
+      // Check notification permission on load
+      if ("Notification" in window) {
+        if (Notification.permission === "granted") {
+          notificationPermission = true;
+        } else if (Notification.permission === "default") {
+          document.getElementById("notifBanner").classList.add("show");
+        }
+      }
+
+      // ============================================================
+      // TOAST
+      // ============================================================
       function showToast(message, type = "success") {
         const toast = document.getElementById("toast");
         toast.textContent = message;
@@ -321,6 +417,9 @@
         }, 4000);
       }
 
+      // ============================================================
+      // RENDER MESSAGES
+      // ============================================================
       function getProfileIcon(sender, isAdmin = false) {
         if (isAdmin) return { emoji: "🛡️", label: "Admin" };
         return sender === "sister"
@@ -328,9 +427,6 @@
           : { emoji: "👨", label: "Brother" };
       }
 
-      // ============================================================
-      // RENDER MESSAGES
-      // ============================================================
       function renderMessages(messages) {
         const container = document.getElementById("chatMessages");
         document.getElementById("messageCount").textContent = messages?.length || 0;
@@ -399,7 +495,6 @@
           })
           .join("");
 
-        // Scroll to bottom
         container.scrollTop = container.scrollHeight;
       }
 
@@ -487,7 +582,6 @@
       // DOWNLOAD FILE
       // ============================================================
       function downloadFile(filename) {
-        // Create a download URL for the file
         const downloadUrl = `${API_BASE}/download_file?filename=${encodeURIComponent(filename)}`;
         window.open(downloadUrl, '_blank');
       }
@@ -497,11 +591,37 @@
       // ============================================================
       async function loadMessages() {
         try {
-          const response = await fetch(`${API_BASE}/messages`);
+          const url = `${API_BASE}/messages?lastSeen=${lastSeenId}`;
+          const response = await fetch(url);
           if (!response.ok) throw new Error("Failed to load messages");
           const data = await response.json();
-          localStorage.setItem("_seb_messages", JSON.stringify(data.messages || []));
-          renderMessages(data.messages || []);
+          
+          if (data.messages && data.messages.length > 0) {
+            const currentMessages = data.messages;
+            const lastMessage = currentMessages[currentMessages.length - 1];
+            
+            // Check for new messages
+            if (lastSeenId > 0 && lastMessage && parseInt(lastMessage.id) > lastSeenId) {
+              const newMessages = currentMessages.filter(m => parseInt(m.id) > lastSeenId);
+              
+              // Send notifications for new messages (excluding admin's own replies)
+              newMessages.forEach(msg => {
+                if (!msg.isAdminReply) {
+                  const senderName = msg.sender === "sister" ? "Sister" : "Brother";
+                  const senderEmoji = msg.sender === "sister" ? "👩" : "👨";
+                  const title = `${senderEmoji} ${senderName}`;
+                  const body = msg.text.length > 60 ? msg.text.substring(0, 60) + "..." : msg.text;
+                  sendBrowserNotification(title, body);
+                }
+              });
+            }
+            
+            if (lastMessage) {
+              lastSeenId = parseInt(lastMessage.id);
+            }
+            
+            renderMessages(currentMessages);
+          }
         } catch (error) {
           console.error("Error loading messages:", error);
         }
@@ -578,8 +698,25 @@
       // ============================================================
       // INIT
       // ============================================================
-      loadMessages();
-      messagePollInterval = setInterval(loadMessages, 5000);
+      async function init() {
+        try {
+          const response = await fetch(`${API_BASE}/messages`);
+          if (response.ok) {
+            const data = await response.json();
+            if (data.messages && data.messages.length > 0) {
+              const lastMessage = data.messages[data.messages.length - 1];
+              lastSeenId = parseInt(lastMessage.id);
+            }
+            renderMessages(data.messages || []);
+          }
+        } catch (error) {
+          console.error("Init error:", error);
+        }
+        
+        messagePollInterval = setInterval(loadMessages, 5000);
+      }
+
+      init();
 
       window.switchTab = switchTab;
       window.startReply = startReply;
@@ -587,6 +724,7 @@
       window.sendReply = sendReply;
       window.sendGeneralMessage = sendGeneralMessage;
       window.downloadFile = downloadFile;
+      window.requestNotificationPermission = requestNotificationPermission;
 
       window.addEventListener("beforeunload", () => {
         if (messagePollInterval) clearInterval(messagePollInterval);
