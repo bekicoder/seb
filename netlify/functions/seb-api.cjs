@@ -2,16 +2,33 @@
 const { Buffer } = require("buffer");
 const { getStore } = require('@netlify/blobs');
 
-// Initialize persistent blob storage
-const store = getStore('seb-data');
+// Initialize persistent blob storage with manual configuration
+let store;
 
-// ============================================================
-// HELPER FUNCTIONS FOR PERSISTENT STORAGE
-// ============================================================
+function getBlobStore() {
+  if (!store) {
+    // Get site ID and token from environment variables
+    const siteID = process.env.SITE_ID || process.env.NETLIFY_SITE_ID;
+    const token = process.env.NETLIFY_ACCESS_TOKEN;
+    
+    if (siteID && token) {
+      store = getStore({
+        name: 'seb-data',
+        siteID: siteID,
+        token: token
+      });
+    } else {
+      // Fallback to automatic configuration (for Netlify environment)
+      store = getStore('seb-data');
+    }
+  }
+  return store;
+}
 
-// Messages helpers
+// Helper functions with error handling
 async function getMessages() {
   try {
+    const store = getBlobStore();
     const data = await store.get('messages.json');
     return data ? JSON.parse(data) : [];
   } catch (error) {
@@ -22,6 +39,7 @@ async function getMessages() {
 
 async function saveMessages(messages) {
   try {
+    const store = getBlobStore();
     await store.set('messages.json', JSON.stringify(messages, null, 2));
   } catch (error) {
     console.error('Error saving messages:', error);
@@ -29,9 +47,9 @@ async function saveMessages(messages) {
   }
 }
 
-// Notifications helpers
 async function getNotifications() {
   try {
+    const store = getBlobStore();
     const data = await store.get('notifications.json');
     return data ? JSON.parse(data) : { lastNotificationId: 0, notifications: [] };
   } catch (error) {
@@ -42,6 +60,7 @@ async function getNotifications() {
 
 async function saveNotifications(notifications) {
   try {
+    const store = getBlobStore();
     await store.set('notifications.json', JSON.stringify(notifications, null, 2));
   } catch (error) {
     console.error('Error saving notifications:', error);
@@ -49,10 +68,9 @@ async function saveNotifications(notifications) {
   }
 }
 
-// File helpers
 async function saveFile(filename, content) {
   try {
-    // Convert Buffer to base64 for storage
+    const store = getBlobStore();
     const base64Content = content.toString('base64');
     await store.set(`files/${filename}`, base64Content);
   } catch (error) {
@@ -63,9 +81,9 @@ async function saveFile(filename, content) {
 
 async function getFile(filename) {
   try {
+    const store = getBlobStore();
     const data = await store.get(`files/${filename}`);
     if (!data) return null;
-    // Convert from base64 back to Buffer
     return Buffer.from(data, 'base64');
   } catch (error) {
     console.error('Error loading file:', error);
@@ -75,17 +93,16 @@ async function getFile(filename) {
 
 async function listFiles() {
   try {
+    const store = getBlobStore();
     const items = await store.list({ prefix: 'files/' });
     const fileDetails = [];
     
     for (const item of items) {
       const filename = item.key.replace('files/', '');
-      // Get file metadata if available
-      const metadata = item.metadata || {};
       fileDetails.push({
         name: filename,
-        size: metadata.size || 0,
-        timestamp: metadata.timestamp || new Date().toISOString()
+        size: 0, // Size not available from list
+        timestamp: new Date().toISOString()
       });
     }
     
@@ -96,18 +113,8 @@ async function listFiles() {
   }
 }
 
-async function deleteFile(filename) {
-  try {
-    await store.delete(`files/${filename}`);
-    return true;
-  } catch (error) {
-    console.error('Error deleting file:', error);
-    return false;
-  }
-}
-
 // ============================================================
-// ORIGINAL FUNCTIONS (UNCHANGED EXCEPT STORAGE)
+// ORIGINAL FUNCTIONS (UNCHANGED)
 // ============================================================
 
 function generateRandomString(length = 10) {
@@ -119,7 +126,7 @@ function generateRandomString(length = 10) {
   return result;
 }
 
-// Parse multipart/form-data (UNCHANGED)
+// Parse multipart/form-data
 async function parseMultipart(event) {
   const contentType = event.headers["content-type"] || "";
   const boundaryMatch = contentType.match(/boundary=([^;]+)/);
@@ -164,7 +171,7 @@ async function parseMultipart(event) {
 }
 
 // ============================================================
-// HANDLERS (UPDATED WITH PERSISTENT STORAGE)
+// HANDLERS
 // ============================================================
 
 // Upload handler
@@ -185,7 +192,6 @@ async function handleUpload(event) {
     const extension = filePart.filename.includes(".") ? "." + filePart.filename.split(".").pop() : "";
     const newFilename = `${baseName}_${generateRandomString(10)}${extension}`;
     
-    // Save to persistent storage instead of /tmp
     await saveFile(newFilename, filePart.content);
 
     return {
@@ -218,19 +224,15 @@ async function handleListFiles() {
   }
 }
 
-// Get messages with notification check
+// Get messages
 async function handleGetMessages(event) {
   try {
     const messages = await getMessages();
     
-    // Get the last notification ID from the request
     const url = new URL(event.rawUrl || `http://localhost${event.path || ''}`);
     const lastSeen = parseInt(url.searchParams.get('lastSeen') || '0');
     
-    // Get current notification state
     const notificationState = await getNotifications();
-    
-    // Find new messages since last seen
     const newMessages = messages.filter(m => parseInt(m.id) > lastSeen);
     
     return { 
@@ -273,7 +275,6 @@ async function handleSendMessage(event) {
     messages.push(newMessage);
     await saveMessages(messages);
     
-    // Update notification state
     let notificationState = await getNotifications();
     notificationState.lastNotificationId = parseInt(newMessage.id);
     notificationState.notifications.push({
@@ -282,7 +283,6 @@ async function handleSendMessage(event) {
       text: text.substring(0, 100),
       timestamp: newMessage.timestamp
     });
-    // Keep only last 50 notifications
     if (notificationState.notifications.length > 50) {
       notificationState.notifications = notificationState.notifications.slice(-50);
     }
@@ -334,7 +334,6 @@ async function handleAdminReply(event) {
     messages[messageIndex].replied = true;
     await saveMessages(messages);
     
-    // Update notification state for admin reply
     let notificationState = await getNotifications();
     notificationState.lastNotificationId = parseInt(reply.id);
     notificationState.notifications.push({
@@ -401,7 +400,7 @@ async function handleDownloadFile(event) {
 }
 
 // ============================================================
-// MAIN HANDLER (UNCHANGED)
+// MAIN HANDLER
 // ============================================================
 
 exports.handler = async (event, context) => {
