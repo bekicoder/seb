@@ -25,7 +25,6 @@ function getBlobStore() {
   return store;
 }
 
-// Helper functions with error handling
 async function getMessages() {
   try {
     const store = getBlobStore();
