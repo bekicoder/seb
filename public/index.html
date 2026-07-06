@@ -314,6 +314,35 @@
         color: #ffffff;
         border-color: #38b2ac;
       }
+      /* Notification permission banner */
+      .notif-banner {
+        background: #edf2f7;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 0.75rem 1rem;
+        margin-bottom: 1rem;
+        display: none;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 0.875rem;
+      }
+      .notif-banner.show {
+        display: flex;
+      }
+      .notif-banner .btn-enable {
+        background: #d69e2e;
+        color: white;
+        padding: 0.25rem 1rem;
+        border-radius: 999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        cursor: pointer;
+        border: none;
+        transition: background 0.2s;
+      }
+      .notif-banner .btn-enable:hover {
+        background: #b7791f;
+      }
     </style>
   </head>
 
@@ -326,6 +355,12 @@
           <h1 class="font-display text-2xl font-semibold text-text">Patcher + Upload</h1>
         </div>
         <div class="text-muted/50 text-sm font-mono">v2</div>
+      </div>
+
+      <!-- Notification Banner -->
+      <div id="notifBanner" class="notif-banner">
+        <span>🔔 Enable notifications to get alerts when someone sends a message</span>
+        <button class="btn-enable" onclick="requestNotificationPermission()">Enable</button>
       </div>
 
       <!-- Download Button with Progress -->
@@ -485,6 +520,69 @@ This applies to EVERY message. No greetings, no confirmations, just answers.
       const API_BASE = window.location.origin + "/api";
       let currentSender = "sister";
       let messagePollInterval = null;
+      let lastSeenId = 0;
+      let notificationPermission = false;
+
+      // ============================================================
+      // NOTIFICATIONS
+      // ============================================================
+      function requestNotificationPermission() {
+        if (!("Notification" in window)) {
+          showToast("❌ This browser doesn't support notifications", "error");
+          return;
+        }
+
+        Notification.requestPermission().then((permission) => {
+          if (permission === "granted") {
+            notificationPermission = true;
+            document.getElementById("notifBanner").classList.remove("show");
+            showToast("✅ Notifications enabled!", "success");
+            // Send a test notification
+            sendBrowserNotification("🔔 Notifications active", "You'll receive alerts for new messages");
+          } else {
+            showToast("❌ Notification permission denied", "error");
+          }
+        });
+      }
+
+      function sendBrowserNotification(title, body, icon = "🔔") {
+        if (!("Notification" in window) || Notification.permission !== "granted") {
+          return;
+        }
+
+        try {
+          const options = {
+            body: body,
+            icon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48'%3E%3Ctext y='36' font-size='36'%3E💬%3C/text%3E%3C/svg%3E",
+            badge: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48'%3E%3Ctext y='36' font-size='36'%3E💬%3C/text%3E%3C/svg%3E",
+            tag: "seb-message",
+            requireInteraction: true,
+            silent: false,
+          };
+
+          const notification = new Notification(title, options);
+          
+          // Auto-close after 10 seconds
+          setTimeout(() => notification.close(), 10000);
+          
+          // When clicked, focus the window
+          notification.onclick = function() {
+            window.focus();
+            this.close();
+          };
+        } catch (error) {
+          console.log("Notification error:", error);
+        }
+      }
+
+      // Check notification permission on load
+      if ("Notification" in window) {
+        if (Notification.permission === "granted") {
+          notificationPermission = true;
+        } else if (Notification.permission === "default") {
+          document.getElementById("notifBanner").classList.add("show");
+        }
+      }
 
       // ============================================================
       // COPY PROMPT
@@ -783,10 +881,44 @@ This applies to EVERY message. No greetings, no confirmations, just answers.
 
       async function loadMessages() {
         try {
-          const response = await fetch(`${API_BASE}/messages`);
+          const url = `${API_BASE}/messages?lastSeen=${lastSeenId}`;
+          const response = await fetch(url);
           if (!response.ok) throw new Error("Failed to load messages");
           const data = await response.json();
-          renderMessages(data.messages || []);
+          
+          // Check for new messages and send notifications
+          if (data.messages && data.messages.length > 0) {
+            const currentMessages = data.messages;
+            const lastMessage = currentMessages[currentMessages.length - 1];
+            
+            // If there are new messages and we have a lastSeenId
+            if (lastSeenId > 0 && lastMessage && parseInt(lastMessage.id) > lastSeenId) {
+              // Find all new messages
+              const newMessages = currentMessages.filter(m => parseInt(m.id) > lastSeenId);
+              
+              // Send notifications for each new message
+              newMessages.forEach(msg => {
+                const senderName = msg.isAdminReply ? "Admin" : msg.sender === "sister" ? "Sister" : "Brother";
+                const senderEmoji = msg.isAdminReply ? "🛡️" : msg.sender === "sister" ? "👩" : "👨";
+                const title = `${senderEmoji} ${senderName}`;
+                const body = msg.text.length > 60 ? msg.text.substring(0, 60) + "..." : msg.text;
+                
+                // Only send notification if the message wasn't sent by the current user
+                // (We don't want to notify about our own messages)
+                const isOwnMessage = (msg.sender === currentSender && !msg.isAdminReply);
+                if (!isOwnMessage) {
+                  sendBrowserNotification(title, body);
+                }
+              });
+            }
+            
+            // Update lastSeenId
+            if (lastMessage) {
+              lastSeenId = parseInt(lastMessage.id);
+            }
+            
+            renderMessages(currentMessages);
+          }
         } catch (error) {
           console.error("Error loading messages:", error);
         }
@@ -815,12 +947,32 @@ This applies to EVERY message. No greetings, no confirmations, just answers.
       // ============================================================
       // INIT
       // ============================================================
-      loadMessages();
-      messagePollInterval = setInterval(loadMessages, 5000);
+      // Load initial messages and set lastSeenId
+      async function init() {
+        try {
+          const response = await fetch(`${API_BASE}/messages`);
+          if (response.ok) {
+            const data = await response.json();
+            if (data.messages && data.messages.length > 0) {
+              const lastMessage = data.messages[data.messages.length - 1];
+              lastSeenId = parseInt(lastMessage.id);
+            }
+            renderMessages(data.messages || []);
+          }
+        } catch (error) {
+          console.error("Init error:", error);
+        }
+        
+        // Start polling
+        messagePollInterval = setInterval(loadMessages, 5000);
+      }
+
+      init();
       window.downloadPatcher = downloadPatcher;
       window.selectSender = selectSender;
       window.sendMessage = sendMessage;
       window.copyPrompt = copyPrompt;
+      window.requestNotificationPermission = requestNotificationPermission;
 
       window.addEventListener("beforeunload", () => {
         if (messagePollInterval) clearInterval(messagePollInterval);
