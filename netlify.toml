@@ -4,19 +4,7 @@
 
 [[redirects]]
   from = "/api/*"
-  to = "/.netlify/functions/seb-api/:splat"
-  status = 200
-  force = true
-
-[[redirects]]
-  from = "/admin"
-  to = "/admin/index.html"
-  status = 200
-  force = true
-
-[[redirects]]
-  from = "/admin/*"
-  to = "/admin/index.html"
+  to = "/.netlify/functions/seb-api"
   status = 200
   force = true
 
@@ -24,15 +12,3 @@
   from = "/*"
   to = "/index.html"
   status = 200
-
-[[headers]]
-  for = "/downloads/*"
-  [headers.values]
-    Content-Type = "application/octet-stream"
-
-[[headers]]
-  for = "/.netlify/functions/*"
-  [headers.values]
-    Access-Control-Allow-Origin = "*"
-    Access-Control-Allow-Headers = "Content-Type"
-    Access-Control-Allow-Methods = "GET, POST, OPTIONS"
