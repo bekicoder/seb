@@ -1,14 +1,25 @@
 [build]
-  publish = "public"
-  functions = "netlify/functions"
+  command = "npm install"
+  publish = "."
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+[build.environment]
+  NODE_VERSION = "18"
 
 [[redirects]]
   from = "/api/*"
-  to = "/.netlify/functions/seb-api"
+  to = "/.netlify/functions/seb-api/:splat"
   status = 200
-  force = true
 
 [[redirects]]
-  from = "/*"
+  from = "/admin"
+  to = "/admin.html"
+  status = 200
+
+[[redirects]]
+  from = "/"
   to = "/index.html"
   status = 200
