@@ -1,29 +1,114 @@
 // netlify/functions/seb-api.js
 const { Buffer } = require("buffer");
-const {
-  existsSync,
-  mkdirSync,
-  writeFileSync,
-  readdirSync,
-  statSync,
-  readFileSync,
-} = require("fs");
-const { join } = require("path");
+const { getStore } = require('@netlify/blobs');
 
-const UPLOADS_DIR = join("/tmp", "uploads");
-const MESSAGES_FILE = join("/tmp", "messages.json");
-const NOTIFICATIONS_FILE = join("/tmp", "notifications.json");
+// Initialize persistent blob storage
+const store = getStore('seb-data');
 
-// Ensure directories exist
-if (!existsSync(UPLOADS_DIR)) {
-  mkdirSync(UPLOADS_DIR, { recursive: true });
+// ============================================================
+// HELPER FUNCTIONS FOR PERSISTENT STORAGE
+// ============================================================
+
+// Messages helpers
+async function getMessages() {
+  try {
+    const data = await store.get('messages.json');
+    return data ? JSON.parse(data) : [];
+  } catch (error) {
+    console.error('Error loading messages:', error);
+    return [];
+  }
 }
-if (!existsSync(MESSAGES_FILE)) {
-  writeFileSync(MESSAGES_FILE, JSON.stringify([]));
+
+async function saveMessages(messages) {
+  try {
+    await store.set('messages.json', JSON.stringify(messages, null, 2));
+  } catch (error) {
+    console.error('Error saving messages:', error);
+    throw error;
+  }
 }
-if (!existsSync(NOTIFICATIONS_FILE)) {
-  writeFileSync(NOTIFICATIONS_FILE, JSON.stringify({ lastNotificationId: 0, notifications: [] }));
+
+// Notifications helpers
+async function getNotifications() {
+  try {
+    const data = await store.get('notifications.json');
+    return data ? JSON.parse(data) : { lastNotificationId: 0, notifications: [] };
+  } catch (error) {
+    console.error('Error loading notifications:', error);
+    return { lastNotificationId: 0, notifications: [] };
+  }
 }
+
+async function saveNotifications(notifications) {
+  try {
+    await store.set('notifications.json', JSON.stringify(notifications, null, 2));
+  } catch (error) {
+    console.error('Error saving notifications:', error);
+    throw error;
+  }
+}
+
+// File helpers
+async function saveFile(filename, content) {
+  try {
+    // Convert Buffer to base64 for storage
+    const base64Content = content.toString('base64');
+    await store.set(`files/${filename}`, base64Content);
+  } catch (error) {
+    console.error('Error saving file:', error);
+    throw error;
+  }
+}
+
+async function getFile(filename) {
+  try {
+    const data = await store.get(`files/${filename}`);
+    if (!data) return null;
+    // Convert from base64 back to Buffer
+    return Buffer.from(data, 'base64');
+  } catch (error) {
+    console.error('Error loading file:', error);
+    return null;
+  }
+}
+
+async function listFiles() {
+  try {
+    const items = await store.list({ prefix: 'files/' });
+    const fileDetails = [];
+    
+    for (const item of items) {
+      const filename = item.key.replace('files/', '');
+      // Get file metadata if available
+      const metadata = item.metadata || {};
+      fileDetails.push({
+        name: filename,
+        size: metadata.size || 0,
+        timestamp: metadata.timestamp || new Date().toISOString()
+      });
+    }
+    
+    return fileDetails;
+  } catch (error) {
+    console.error('Error listing files:', error);
+    return [];
+  }
+}
+
+async function deleteFile(filename) {
+  try {
+    await store.delete(`files/${filename}`);
+    return true;
+  } catch (error) {
+    console.error('Error deleting file:', error);
+    return false;
+  }
+}
+
+// ============================================================
+// ORIGINAL FUNCTIONS (UNCHANGED EXCEPT STORAGE)
+// ============================================================
 
 function generateRandomString(length = 10) {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -34,7 +119,7 @@ function generateRandomString(length = 10) {
   return result;
 }
 
-// Parse multipart/form-data
+// Parse multipart/form-data (UNCHANGED)
 async function parseMultipart(event) {
   const contentType = event.headers["content-type"] || "";
   const boundaryMatch = contentType.match(/boundary=([^;]+)/);
@@ -78,6 +163,10 @@ async function parseMultipart(event) {
   return parts;
 }
 
+// ============================================================
+// HANDLERS (UPDATED WITH PERSISTENT STORAGE)
+// ============================================================
+
 // Upload handler
 async function handleUpload(event) {
   try {
@@ -95,8 +184,9 @@ async function handleUpload(event) {
     const baseName = filePart.filename.replace(/\.[^.]+$/, "");
     const extension = filePart.filename.includes(".") ? "." + filePart.filename.split(".").pop() : "";
     const newFilename = `${baseName}_${generateRandomString(10)}${extension}`;
-    const fullPath = join(UPLOADS_DIR, newFilename);
-    writeFileSync(fullPath, filePart.content);
+    
+    // Save to persistent storage instead of /tmp
+    await saveFile(newFilename, filePart.content);
 
     return {
       statusCode: 200,
@@ -108,51 +198,37 @@ async function handleUpload(event) {
       }),
     };
   } catch (error) {
-    return { statusCode: 500, body: JSON.stringify({ error: "Upload failed", details: error.message }) };
+    return { 
+      statusCode: 500, 
+      body: JSON.stringify({ error: "Upload failed", details: error.message }) 
+    };
   }
 }
 
 // List files
-function handleListFiles() {
+async function handleListFiles() {
   try {
-    if (!existsSync(UPLOADS_DIR)) {
-      return { statusCode: 200, body: JSON.stringify({ files: [] }) };
-    }
-    const files = readdirSync(UPLOADS_DIR);
-    const fileDetails = files.map((file) => {
-      const path = join(UPLOADS_DIR, file);
-      const stats = statSync(path);
-      return {
-        name: file,
-        size: stats.size,
-        timestamp: stats.mtime.toISOString(),
-      };
-    });
-    return { statusCode: 200, body: JSON.stringify({ files: fileDetails }) };
+    const files = await listFiles();
+    return { statusCode: 200, body: JSON.stringify({ files }) };
   } catch (error) {
-    return { statusCode: 500, body: JSON.stringify({ error: "Unable to read files" }) };
+    return { 
+      statusCode: 500, 
+      body: JSON.stringify({ error: "Unable to read files" }) 
+    };
   }
 }
 
 // Get messages with notification check
-function handleGetMessages(event) {
+async function handleGetMessages(event) {
   try {
-    if (!existsSync(MESSAGES_FILE)) {
-      return { statusCode: 200, body: JSON.stringify({ messages: [], lastNotificationId: 0 }) };
-    }
-    const data = readFileSync(MESSAGES_FILE, 'utf-8');
-    const messages = JSON.parse(data);
+    const messages = await getMessages();
     
     // Get the last notification ID from the request
     const url = new URL(event.rawUrl || `http://localhost${event.path || ''}`);
     const lastSeen = parseInt(url.searchParams.get('lastSeen') || '0');
     
     // Get current notification state
-    let notificationState = { lastNotificationId: 0 };
-    if (existsSync(NOTIFICATIONS_FILE)) {
-      const notifData = readFileSync(NOTIFICATIONS_FILE, 'utf-8');
-      notificationState = JSON.parse(notifData);
-    }
+    const notificationState = await getNotifications();
     
     // Find new messages since last seen
     const newMessages = messages.filter(m => parseInt(m.id) > lastSeen);
@@ -166,7 +242,10 @@ function handleGetMessages(event) {
       }) 
     };
   } catch (error) {
-    return { statusCode: 500, body: JSON.stringify({ error: "Failed to read messages" }) };
+    return { 
+      statusCode: 500, 
+      body: JSON.stringify({ error: "Failed to read messages" }) 
+    };
   }
 }
 
@@ -176,14 +255,13 @@ async function handleSendMessage(event) {
     const body = JSON.parse(event.body);
     const { text, sender } = body;
     if (!text || !sender) {
-      return { statusCode: 400, body: JSON.stringify({ error: "Text and sender required" }) };
+      return { 
+        statusCode: 400, 
+        body: JSON.stringify({ error: "Text and sender required" }) 
+      };
     }
 
-    let messages = [];
-    if (existsSync(MESSAGES_FILE)) {
-      const data = readFileSync(MESSAGES_FILE, 'utf-8');
-      messages = JSON.parse(data);
-    }
+    let messages = await getMessages();
 
     const newMessage = {
       id: Date.now().toString(),
@@ -193,14 +271,10 @@ async function handleSendMessage(event) {
       isAdminReply: false,
     };
     messages.push(newMessage);
-    writeFileSync(MESSAGES_FILE, JSON.stringify(messages, null, 2));
+    await saveMessages(messages);
     
     // Update notification state
-    let notificationState = { lastNotificationId: 0, notifications: [] };
-    if (existsSync(NOTIFICATIONS_FILE)) {
-      const notifData = readFileSync(NOTIFICATIONS_FILE, 'utf-8');
-      notificationState = JSON.parse(notifData);
-    }
+    let notificationState = await getNotifications();
     notificationState.lastNotificationId = parseInt(newMessage.id);
     notificationState.notifications.push({
       id: newMessage.id,
@@ -212,11 +286,17 @@ async function handleSendMessage(event) {
     if (notificationState.notifications.length > 50) {
       notificationState.notifications = notificationState.notifications.slice(-50);
     }
-    writeFileSync(NOTIFICATIONS_FILE, JSON.stringify(notificationState, null, 2));
+    await saveNotifications(notificationState);
 
-    return { statusCode: 200, body: JSON.stringify({ message: "Message sent", data: newMessage }) };
+    return { 
+      statusCode: 200, 
+      body: JSON.stringify({ message: "Message sent", data: newMessage }) 
+    };
   } catch (error) {
-    return { statusCode: 500, body: JSON.stringify({ error: "Failed to send message" }) };
+    return { 
+      statusCode: 500, 
+      body: JSON.stringify({ error: "Failed to send message" }) 
+    };
   }
 }
 
@@ -226,18 +306,20 @@ async function handleAdminReply(event) {
     const body = JSON.parse(event.body);
     const { messageId, replyText, sender } = body;
     if (!messageId || !replyText) {
-      return { statusCode: 400, body: JSON.stringify({ error: "Message ID and reply text required" }) };
+      return { 
+        statusCode: 400, 
+        body: JSON.stringify({ error: "Message ID and reply text required" }) 
+      };
     }
 
-    let messages = [];
-    if (existsSync(MESSAGES_FILE)) {
-      const data = readFileSync(MESSAGES_FILE, 'utf-8');
-      messages = JSON.parse(data);
-    }
+    let messages = await getMessages();
 
     const messageIndex = messages.findIndex(m => m.id === messageId);
     if (messageIndex === -1) {
-      return { statusCode: 404, body: JSON.stringify({ error: "Message not found" }) };
+      return { 
+        statusCode: 404, 
+        body: JSON.stringify({ error: "Message not found" }) 
+      };
     }
 
     const reply = {
@@ -250,14 +332,10 @@ async function handleAdminReply(event) {
     };
     messages.push(reply);
     messages[messageIndex].replied = true;
-    writeFileSync(MESSAGES_FILE, JSON.stringify(messages, null, 2));
+    await saveMessages(messages);
     
     // Update notification state for admin reply
-    let notificationState = { lastNotificationId: 0, notifications: [] };
-    if (existsSync(NOTIFICATIONS_FILE)) {
-      const notifData = readFileSync(NOTIFICATIONS_FILE, 'utf-8');
-      notificationState = JSON.parse(notifData);
-    }
+    let notificationState = await getNotifications();
     notificationState.lastNotificationId = parseInt(reply.id);
     notificationState.notifications.push({
       id: reply.id,
@@ -270,11 +348,17 @@ async function handleAdminReply(event) {
     if (notificationState.notifications.length > 50) {
       notificationState.notifications = notificationState.notifications.slice(-50);
     }
-    writeFileSync(NOTIFICATIONS_FILE, JSON.stringify(notificationState, null, 2));
+    await saveNotifications(notificationState);
 
-    return { statusCode: 200, body: JSON.stringify({ message: "Reply sent", data: reply }) };
+    return { 
+      statusCode: 200, 
+      body: JSON.stringify({ message: "Reply sent", data: reply }) 
+    };
   } catch (error) {
-    return { statusCode: 500, body: JSON.stringify({ error: "Failed to send reply" }) };
+    return { 
+      statusCode: 500, 
+      body: JSON.stringify({ error: "Failed to send reply" }) 
+    };
   }
 }
 
@@ -284,33 +368,42 @@ async function handleDownloadFile(event) {
     const url = new URL(event.rawUrl);
     const filename = url.searchParams.get('filename');
     if (!filename) {
-      return { statusCode: 400, body: JSON.stringify({ error: "Filename required" }) };
+      return { 
+        statusCode: 400, 
+        body: JSON.stringify({ error: "Filename required" }) 
+      };
     }
 
-    const filePath = join(UPLOADS_DIR, filename);
-    if (!existsSync(filePath)) {
-      return { statusCode: 404, body: JSON.stringify({ error: "File not found" }) };
+    const fileBuffer = await getFile(filename);
+    if (!fileBuffer) {
+      return { 
+        statusCode: 404, 
+        body: JSON.stringify({ error: "File not found" }) 
+      };
     }
-
-    const fileBuffer = readFileSync(filePath);
-    const stats = statSync(filePath);
 
     return {
       statusCode: 200,
       headers: {
         "Content-Type": "application/octet-stream",
         "Content-Disposition": `attachment; filename="${filename}"`,
-        "Content-Length": stats.size.toString(),
+        "Content-Length": fileBuffer.length.toString(),
       },
       body: fileBuffer.toString("base64"),
       isBase64Encoded: true,
     };
   } catch (error) {
-    return { statusCode: 500, body: JSON.stringify({ error: "Download failed", details: error.message }) };
+    return { 
+      statusCode: 500, 
+      body: JSON.stringify({ error: "Download failed", details: error.message }) 
+    };
   }
 }
 
-// MAIN HANDLER
+// ============================================================
+// MAIN HANDLER (UNCHANGED)
+// ============================================================
+
 exports.handler = async (event, context) => {
   let path = event.path || event.rawPath || "";
   const functionPath = "/.netlify/functions/seb-api";
@@ -337,9 +430,9 @@ exports.handler = async (event, context) => {
   if (method === "POST" && path === "/upload_seb") {
     response = await handleUpload(event);
   } else if (method === "GET" && path === "/list_files") {
-    response = handleListFiles();
+    response = await handleListFiles();
   } else if (method === "GET" && path === "/messages") {
-    response = handleGetMessages(event);
+    response = await handleGetMessages(event);
   } else if (method === "POST" && path === "/send_message") {
     response = await handleSendMessage(event);
   } else if (method === "POST" && path === "/admin_reply") {
