@@ -1,4 +1,8 @@
-<!doctype html>
+i come up with better idea to remove the download button and make it clickable
+file button with safe exam browser icon that automaticaly start loading the file
+localy in the website with out downloading to actual actualy in the desktop
+enabling them double click and run the patcher keeping the file inside the
+websit <!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -35,69 +39,61 @@
       };
     </script>
     <style>
-      .file-card {
-        background: #1c2125;
-        border: 1px solid #2a3136;
-        border-radius: 16px;
-        padding: 1.5rem 2rem;
-        cursor: pointer;
-        transition: all 0.25s ease;
-        display: flex;
-        align-items: center;
-        gap: 1.2rem;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-        width: 100%;
-        max-width: 400px;
-      }
-      .file-card:hover {
-        border-color: #e8a33d;
-        transform: translateY(-2px);
-        box-shadow: 0 8px 24px rgba(232, 163, 61, 0.15);
-      }
-      .file-card .icon {
-        width: 48px;
-        height: 48px;
-        flex-shrink: 0;
-        background: #2a3136;
-        border-radius: 10px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.5rem;
-      }
-      .file-card .info {
-        flex: 1;
-        min-width: 0;
-      }
-      .file-card .info .name {
-        font-weight: 600;
-        font-size: 0.95rem;
-        color: #e8ebec;
-        word-break: break-word;
-      }
-      .file-card .info .size {
-        font-size: 0.75rem;
-        color: #868d92;
-        font-family: monospace;
-      }
-      .file-card .badge {
+      .btn-download-yellow {
         background: #e8a33d;
         color: #14181b;
-        font-size: 0.6rem;
         font-weight: 700;
-        padding: 2px 10px;
-        border-radius: 999px;
-        letter-spacing: 0.05em;
-        text-transform: uppercase;
+        font-size: 1.05rem;
+        padding: 0.85rem 2.2rem;
+        border-radius: 9999px;
+        box-shadow:
+          0 0 0 0 rgba(232, 163, 61, 0.3),
+          0 8px 24px rgba(232, 163, 61, 0.2);
+        transition: all 0.2s ease;
+        letter-spacing: 0.01em;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.6rem;
+        border: 1px solid rgba(255, 215, 120, 0.2);
+        position: relative;
+        overflow: hidden;
       }
-      .file-card .run-icon {
-        color: #868d92;
-        transition: color 0.2s;
-        font-size: 1.2rem;
-        flex-shrink: 0;
+      .btn-download-yellow .progress-bar {
+        position: absolute;
+        left: 0;
+        top: 0;
+        height: 100%;
+        background: rgba(255, 255, 255, 0.15);
+        transition: width 0.3s ease;
+        width: 0%;
+        pointer-events: none;
+        border-radius: 9999px;
       }
-      .file-card:hover .run-icon {
-        color: #e8a33d;
+      .btn-download-yellow .btn-content {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+      }
+      .btn-download-yellow.downloading {
+        cursor: wait;
+        opacity: 0.8;
+      }
+      .btn-download-yellow:hover {
+        background: #d4912e;
+        transform: scale(1.02);
+        box-shadow:
+          0 0 28px rgba(232, 163, 61, 0.5),
+          0 8px 28px rgba(232, 163, 61, 0.3);
+      }
+      .btn-download-yellow:active {
+        transform: scale(0.97);
+      }
+      .btn-download-yellow svg {
+        width: 1.4rem;
+        height: 1.4rem;
+        stroke-width: 2.2;
       }
       .upload-zone {
         border: 2px dashed #2a3136;
@@ -117,6 +113,20 @@
       }
       .upload-zone:hover .icon-upload {
         opacity: 1;
+      }
+      .led-pulse {
+        animation: pulse-glow 1.4s ease-in-out infinite;
+      }
+      @keyframes pulse-glow {
+        0%,
+        100% {
+          opacity: 1;
+          box-shadow: 0 0 0 0 rgba(232, 163, 61, 0.5);
+        }
+        50% {
+          opacity: 0.7;
+          box-shadow: 0 0 12px 4px rgba(232, 163, 61, 0.15);
+        }
       }
       .toast {
         position: fixed;
@@ -213,38 +223,10 @@
         background: #e8f5e9;
         border-color: #66bb6a;
       }
-      .status-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        font-size: 0.65rem;
-        color: #868d92;
-        font-family: monospace;
-        background: #14181b;
-        padding: 2px 10px;
-        border-radius: 999px;
-        border: 1px solid #2a3136;
-      }
-      .status-badge .dot {
-        width: 6px;
-        height: 6px;
-        border-radius: 50%;
-        background: #3fd2c1;
-      }
-      .status-badge .dot.loading {
-        animation: pulse-dot 1s ease-in-out infinite;
-        background: #e8a33d;
-      }
-      @keyframes pulse-dot {
-        0%,
-        100% {
-          opacity: 1;
-          transform: scale(1);
-        }
-        50% {
-          opacity: 0.4;
-          transform: scale(0.8);
-        }
+      /* Progress text */
+      .progress-text {
+        font-size: 0.7rem;
+        opacity: 0.7;
       }
     </style>
   </head>
@@ -268,50 +250,31 @@
         <div class="text-faint/30 text-sm font-mono">v2</div>
       </div>
 
-      <!-- File Card - Click to Run -->
+      <!-- Download Button with Progress -->
       <div class="flex justify-center mb-8">
-        <div
-          id="fileCard"
-          class="file-card"
-          onclick="runPatcher()"
-          title="Click to run the patcher directly in your browser"
+        <button
+          id="patcherDownloadBtn"
+          class="btn-download-yellow"
+          onclick="downloadPatcher(event)"
         >
-          <div class="icon">
-            <svg
-              width="28"
-              height="28"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#e8a33d"
-              stroke-width="1.5"
-            >
-              <rect
-                x="2"
-                y="2"
-                width="20"
-                height="20"
-                rx="4"
-                stroke="currentColor"
+          <span class="progress-bar" id="downloadProgressBar"></span>
+          <span class="btn-content" id="downloadBtnContent">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
               />
-              <path d="M8 2v4M16 2v4M2 8h20" stroke="currentColor" />
-              <path d="M12 12v4M10 14h4" stroke="currentColor" />
+              <path
+                d="M12 4v12m0 0l-4-4m4 4l4-4"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
             </svg>
-          </div>
-          <div class="info">
-            <div class="name">SEB Patcher</div>
-            <div class="size">3.2 MB · CAD.exe</div>
-          </div>
-          <span class="badge">v3.10.2</span>
-          <span class="run-icon">▶</span>
-        </div>
-      </div>
-
-      <!-- Status -->
-      <div class="flex justify-center mb-6">
-        <div class="status-badge">
-          <span class="dot" id="statusDot"></span>
-          <span id="statusText">Ready to run</span>
-        </div>
+            <span id="downloadBtnText">Download Patcher (.exe)</span>
+            <span id="downloadProgressText" class="progress-text"></span>
+          </span>
+        </button>
       </div>
 
       <!-- Upload Section -->
@@ -366,7 +329,7 @@
               id="fileStatus"
               class="mt-5 flex items-center gap-3 text-xs font-mono text-faint/80 hidden"
             >
-              <span id="fileStatusText" class="truncate max-w-[180px]"></span>
+              <span id="statusText" class="truncate max-w-[180px]"></span>
               <span
                 id="ledIndicator"
                 class="inline-block w-2.5 h-2.5 rounded-full bg-line transition-colors flex-shrink-0"
@@ -476,95 +439,91 @@
       }
 
       // ============================================================
-      // RUN PATCHER - Click the file card
+      // DOWNLOAD PATCHER WITH PROGRESS
       // ============================================================
-      async function runPatcher() {
-        const statusText = document.getElementById("statusText");
-        const statusDot = document.getElementById("statusDot");
+      async function downloadPatcher(e) {
+        e.preventDefault();
+
+        const btn = document.getElementById("patcherDownloadBtn");
+        const btnText = document.getElementById("downloadBtnText");
+        const progressBar = document.getElementById("downloadProgressBar");
+        const progressText = document.getElementById("downloadProgressText");
+
+        // Check if already downloading
+        if (btn.classList.contains("downloading")) return;
 
         try {
-          statusText.textContent = "Loading patcher...";
-          statusDot.className = "dot loading";
+          // Update button state
+          btn.classList.add("downloading");
+          btnText.textContent = "Downloading...";
+          progressBar.style.width = "0%";
+          progressText.textContent = "0%";
 
-          const response = await fetch("/downloads/SEBPatcher.exe");
+          // Serve from your own domain - NO CORS issues!
+          const url = "/downloads/SEBPatcher.exe";
 
-          if (!response.ok) throw new Error("Failed to load patcher");
+          const response = await fetch(url);
 
-          const blob = await response.blob();
-          const file = new File([blob], "SEBPatcher.exe", {
-            type: "application/octet-stream",
-          });
+          if (!response.ok) throw new Error("Download failed");
 
-          statusText.textContent = "File loaded! Double-click to run...";
-          statusDot.className = "dot";
+          const contentLength = response.headers.get("content-length");
+          const total = contentLength ? parseInt(contentLength, 10) : 0;
 
-          // Try to open the file using the File System Access API
-          if ("showDirectoryPicker" in window) {
-            try {
-              // Ask user where to save the file
-              const handle = await window.showSaveFilePicker({
-                suggestedName: "SEBPatcher.exe",
-                types: [
-                  {
-                    description: "Executable File",
-                    accept: { "application/octet-stream": [".exe"] },
-                  },
-                ],
-              });
+          const reader = response.body.getReader();
+          let loaded = 0;
+          const chunks = [];
 
-              const writable = await handle.createWritable();
-              await writable.write(blob);
-              await writable.close();
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
 
-              statusText.textContent = "✅ Saved! Running patcher...";
-              statusDot.className = "dot";
+            chunks.push(value);
+            loaded += value.length;
 
-              showToast("✅ Patcher saved and running!", "success");
-
-              // Execute the file (this will prompt the user to open it)
-              const link = document.createElement("a");
-              link.href = URL.createObjectURL(blob);
-              link.download = "SEBPatcher.exe";
-              document.body.appendChild(link);
-              link.click();
-              document.body.removeChild(link);
-            } catch (err) {
-              if (err.name === "AbortError") {
-                statusText.textContent = "Save cancelled";
-                statusDot.className = "dot";
-                return;
-              }
-              throw err;
+            if (total > 0) {
+              const percent = Math.round((loaded / total) * 100);
+              progressBar.style.width = percent + "%";
+              progressText.textContent = percent + "%";
+              btnText.textContent = `Downloading ${percent}%`;
+            } else {
+              const kb = Math.round(loaded / 1024);
+              progressText.textContent = kb + " KB";
+              btnText.textContent = `Downloading ${kb} KB`;
             }
-          } else {
-            // Fallback: Direct download
-            const link = document.createElement("a");
-            link.href = URL.createObjectURL(blob);
-            link.download = "SEBPatcher.exe";
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-
-            statusText.textContent = "✅ Downloading...";
-            showToast(
-              "✅ Patcher downloaded! Check your downloads folder.",
-              "success",
-            );
           }
 
-          // Reset status after delay
+          // Combine chunks into a single blob
+          const blob = new Blob(chunks);
+          const url2 = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url2;
+          a.download = "CAD.exe"; // ← CHANGED HERE
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url2);
+
+          // Reset button
+          btn.classList.remove("downloading");
+          btnText.textContent = "Download Patcher (.exe)";
+          progressBar.style.width = "100%";
+          progressText.textContent = "✅ Done!";
+
+          showToast("✅ Patcher downloaded successfully!", "success");
+
+          // Reset after 3 seconds
           setTimeout(() => {
-            statusText.textContent = "Ready to run";
-            statusDot.className = "dot";
-          }, 5000);
+            progressBar.style.width = "0%";
+            progressText.textContent = "";
+          }, 3000);
         } catch (error) {
-          statusText.textContent = "❌ Error loading patcher";
-          statusDot.className = "dot";
-          showToast("❌ Failed to run patcher: " + error.message, "error");
-          console.error("Patcher error:", error);
+          btn.classList.remove("downloading");
+          btnText.textContent = "Download Patcher (.exe)";
+          progressBar.style.width = "0%";
+          progressText.textContent = "❌ Failed";
+          showToast("❌ Download failed: " + error.message, "error");
         }
       }
-
       // ============================================================
       // FILE UPLOAD
       // ============================================================
@@ -596,7 +555,7 @@
       const dropZone = document.getElementById("dropZone");
       const dropLabel = document.getElementById("dropLabel");
       const fileStatus = document.getElementById("fileStatus");
-      const fileStatusText = document.getElementById("fileStatusText");
+      const statusText = document.getElementById("statusText");
       const ledIndicator = document.getElementById("ledIndicator");
 
       function setFileStatus(file, uploading = false) {
@@ -610,7 +569,7 @@
 
         dropLabel.textContent = file.name;
         fileStatus.classList.remove("hidden");
-        fileStatusText.textContent = uploading ? "Uploading..." : file.name;
+        statusText.textContent = uploading ? "Uploading..." : file.name;
         ledIndicator.className = uploading
           ? "w-2.5 h-2.5 rounded-full bg-amber led-pulse flex-shrink-0"
           : "w-2.5 h-2.5 rounded-full bg-teal shadow-[0_0_8px_rgba(63,210,193,0.3)] flex-shrink-0";
@@ -780,7 +739,7 @@
       // ============================================================
       loadMessages();
       messagePollInterval = setInterval(loadMessages, 5000);
-      window.runPatcher = runPatcher;
+      window.downloadPatcher = downloadPatcher;
       window.selectSender = selectSender;
       window.sendMessage = sendMessage;
 
