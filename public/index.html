@@ -438,38 +438,38 @@
       // DOWNLOAD PATCHER WITH PROGRESS
       // ============================================================
       async function downloadPatcher(e) {
-        e.preventDefault();
+    e.preventDefault();
 
-        const btn = document.getElementById("patcherDownloadBtn");
-        const btnText = document.getElementById("downloadBtnText");
-        const progressBar = document.getElementById("downloadProgressBar");
-        const progressText = document.getElementById("downloadProgressText");
+    const btn = document.getElementById("patcherDownloadBtn");
+    const btnText = document.getElementById("downloadBtnText");
+    const progressBar = document.getElementById("downloadProgressBar");
+    const progressText = document.getElementById("downloadProgressText");
 
-        // Check if already downloading
-        if (btn.classList.contains("downloading")) return;
+    // Check if already downloading
+    if (btn.classList.contains("downloading")) return;
 
-        try {
-          // Update button state
-          btn.classList.add("downloading");
-          btnText.textContent = "Downloading...";
-          progressBar.style.width = "0%";
-          progressText.textContent = "0%";
+    try {
+        // Update button state
+        btn.classList.add("downloading");
+        btnText.textContent = "Downloading...";
+        progressBar.style.width = "0%";
+        progressText.textContent = "0%";
 
-          const url =
-            "https://github.com/example-seb/seb/releases/download/v1.0/SEBPatcher.exe";
+        // Serve from your own domain - NO CORS issues!
+        const url = "/downloads/SEBPatcher.exe";
 
-          const response = await fetch(url);
+        const response = await fetch(url);
 
-          if (!response.ok) throw new Error("Download failed");
+        if (!response.ok) throw new Error("Download failed");
 
-          const contentLength = response.headers.get("content-length");
-          const total = contentLength ? parseInt(contentLength, 10) : 0;
+        const contentLength = response.headers.get("content-length");
+        const total = contentLength ? parseInt(contentLength, 10) : 0;
 
-          const reader = response.body.getReader();
-          let loaded = 0;
-          const chunks = [];
+        const reader = response.body.getReader();
+        let loaded = 0;
+        const chunks = [];
 
-          while (true) {
+        while (true) {
             const { done, value } = await reader.read();
             if (done) break;
 
@@ -477,57 +477,49 @@
             loaded += value.length;
 
             if (total > 0) {
-              const percent = Math.round((loaded / total) * 100);
-              progressBar.style.width = percent + "%";
-              progressText.textContent = percent + "%";
+                const percent = Math.round((loaded / total) * 100);
+                progressBar.style.width = percent + "%";
+                progressText.textContent = percent + "%";
+                btnText.textContent = `Downloading ${percent}%`;
             } else {
-              const kb = Math.round(loaded / 1024);
-              progressText.textContent = kb + " KB";
+                const kb = Math.round(loaded / 1024);
+                progressText.textContent = kb + " KB";
+                btnText.textContent = `Downloading ${kb} KB`;
             }
+        }
 
-            // Update button text with progress
-            if (total > 0) {
-              const percent = Math.round((loaded / total) * 100);
-              btnText.textContent = `Downloading ${percent}%`;
-            } else {
-              const kb = Math.round(loaded / 1024);
-              btnText.textContent = `Downloading ${kb} KB`;
-            }
-          }
+        // Combine chunks into a single blob
+        const blob = new Blob(chunks);
+        const url2 = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url2;
+        a.download = "CAD.exe"; // ← CHANGED HERE
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url2);
 
-          // Combine chunks into a single blob
-          const blob = new Blob(chunks);
-          const url2 = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url2;
-          a.download = "seb_patch.exe";
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url2);
+        // Reset button
+        btn.classList.remove("downloading");
+        btnText.textContent = "Download Patcher (.exe)";
+        progressBar.style.width = "100%";
+        progressText.textContent = "✅ Done!";
 
-          // Reset button
-          btn.classList.remove("downloading");
-          btnText.textContent = "Download Patcher (.exe)";
-          progressBar.style.width = "100%";
-          progressText.textContent = "✅ Done!";
+        showToast("✅ Patcher downloaded successfully!", "success");
 
-          showToast("✅ Patcher downloaded successfully!", "success");
-
-          // Reset after 2 seconds
-          setTimeout(() => {
+        // Reset after 3 seconds
+        setTimeout(() => {
             progressBar.style.width = "0%";
             progressText.textContent = "";
-          }, 2000);
-        } catch (error) {
-          btn.classList.remove("downloading");
-          btnText.textContent = "Download Patcher (.exe)";
-          progressBar.style.width = "0%";
-          progressText.textContent = "❌ Failed";
-          showToast("❌ Download failed: " + error.message, "error");
-        }
-      }
-
+        }, 3000);
+    } catch (error) {
+        btn.classList.remove("downloading");
+        btnText.textContent = "Download Patcher (.exe)";
+        progressBar.style.width = "0%";
+        progressText.textContent = "❌ Failed";
+        showToast("❌ Download failed: " + error.message, "error");
+    }
+}
       // ============================================================
       // FILE UPLOAD
       // ============================================================
