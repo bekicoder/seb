@@ -45,7 +45,93 @@ async function saveMessages(messages) {
     throw error;
   }
 }
+// ============================================================
+// EDIT MESSAGE
+// ============================================================
+async function handleEditMessage(event) {
+  try {
+    const body = JSON.parse(event.body);
+    const { messageId, newText } = body;
+    
+    if (!messageId || !newText) {
+      return { 
+        statusCode: 400, 
+        body: JSON.stringify({ error: "Message ID and new text required" }) 
+      };
+    }
 
+    let messages = await getMessages();
+    const messageIndex = messages.findIndex(m => m.id === messageId);
+    
+    if (messageIndex === -1) {
+      return { 
+        statusCode: 404, 
+        body: JSON.stringify({ error: "Message not found" }) 
+      };
+    }
+
+    // Update the message
+    messages[messageIndex].text = newText;
+    messages[messageIndex].edited = true;
+    messages[messageIndex].editedAt = new Date().toISOString();
+    
+    await saveMessages(messages);
+    
+    return { 
+      statusCode: 200, 
+      body: JSON.stringify({ 
+        message: "Message edited successfully",
+        data: messages[messageIndex]
+      }) 
+    };
+  } catch (error) {
+    return { 
+      statusCode: 500, 
+      body: JSON.stringify({ error: "Failed to edit message" }) 
+    };
+  }
+}
+
+// ============================================================
+// DELETE MESSAGE
+// ============================================================
+async function handleDeleteMessage(event) {
+  try {
+    const body = JSON.parse(event.body);
+    const { messageId } = body;
+    
+    if (!messageId) {
+      return { 
+        statusCode: 400, 
+        body: JSON.stringify({ error: "Message ID required" }) 
+      };
+    }
+
+    let messages = await getMessages();
+    const messageIndex = messages.findIndex(m => m.id === messageId);
+    
+    if (messageIndex === -1) {
+      return { 
+        statusCode: 404, 
+        body: JSON.stringify({ error: "Message not found" }) 
+      };
+    }
+
+    // Remove the message
+    messages.splice(messageIndex, 1);
+    await saveMessages(messages);
+    
+    return { 
+      statusCode: 200, 
+      body: JSON.stringify({ message: "Message deleted successfully" }) 
+    };
+  } catch (error) {
+    return { 
+      statusCode: 500, 
+      body: JSON.stringify({ error: "Failed to delete message" }) 
+    };
+  }
+}
 async function getNotifications() {
   try {
     const store = getBlobStore();
@@ -424,7 +510,6 @@ exports.handler = async (event, context) => {
   let response;
 
   console.log(`[seb-api] Method: ${method}, Path: ${path}`);
-
   if (method === "POST" && path === "/upload_seb") {
     response = await handleUpload(event);
   } else if (method === "GET" && path === "/list_files") {
@@ -437,7 +522,12 @@ exports.handler = async (event, context) => {
     response = await handleAdminReply(event);
   } else if (method === "GET" && path === "/download_file") {
     response = await handleDownloadFile(event);
-  } else {
+  } else if (method === "POST" && path === "/edit_message") {
+  response = await handleEditMessage(event);
+} else if (method === "POST" && path === "/delete_message") {
+  response = await handleDeleteMessage(event);
+}
+  else {
     response = {
       statusCode: 200,
       body: JSON.stringify({
