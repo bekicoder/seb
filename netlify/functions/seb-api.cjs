@@ -181,14 +181,39 @@ async function getFile(filename) {
 async function listFiles() {
   try {
     const store = getBlobStore();
-    const items = await store.list({ prefix: 'files/' });
+    const result = await store.list({ prefix: 'files/' });
+    
+    // Handle both array response and object with blobs property
+    let items = [];
+    if (Array.isArray(result)) {
+      items = result;
+    } else if (result && typeof result === 'object') {
+      // Check for blobs property (common in Netlify Blobs)
+      if (result.blobs && Array.isArray(result.blobs)) {
+        items = result.blobs;
+      } else {
+        // Try to convert object to array of keys
+        items = Object.keys(result).filter(key => key.startsWith('files/')).map(key => ({ key }));
+      }
+    }
+    
     const fileDetails = [];
     
     for (const item of items) {
-      const filename = item.key.replace('files/', '');
+      let filename = '';
+      if (typeof item === 'string') {
+        filename = item.replace('files/', '');
+      } else if (item.key) {
+        filename = item.key.replace('files/', '');
+      } else if (item.path) {
+        filename = item.path.replace('files/', '');
+      } else {
+        continue;
+      }
+      
       fileDetails.push({
         name: filename,
-        size: 0,
+        size: item.size || 0,
         timestamp: new Date().toISOString()
       });
     }
