@@ -165,36 +165,6 @@
         color: #14181b;
         border-color: #3fd2c1;
       }
-      .notif-banner {
-        background: #1c2125;
-        border: 1px solid #2a3136;
-        border-radius: 12px;
-        padding: 0.75rem 1rem;
-        margin-bottom: 1rem;
-        display: none;
-        align-items: center;
-        justify-content: space-between;
-        font-size: 0.875rem;
-      }
-      .notif-banner.show {
-        display: flex;
-      }
-      .notif-banner .btn-enable {
-        background: #e8a33d;
-        color: #14181b;
-        padding: 0.25rem 1rem;
-        border-radius: 999px;
-        font-size: 0.75rem;
-        font-weight: 600;
-        cursor: pointer;
-        border: none;
-        transition: background 0.2s;
-      }
-      .notif-banner .btn-enable:hover {
-        background: #d6952a;
-      }
-
-      /* Action buttons */
       .action-btn {
         font-size: 11px;
         padding: 2px 10px;
@@ -248,6 +218,56 @@
       .edit-input:focus {
         border-color: #3fd2c1;
       }
+      /* Chat image styles */
+      .chat-image {
+        max-width: 150px;
+        max-height: 150px;
+        border-radius: 8px;
+        cursor: pointer;
+        border: 1px solid #2a3136;
+        margin-top: 0.5rem;
+        transition: transform 0.2s;
+      }
+      .chat-image:hover {
+        transform: scale(1.02);
+      }
+      /* Image overlay */
+      .image-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.95);
+        z-index: 9999;
+        justify-content: center;
+        align-items: center;
+        cursor: pointer;
+      }
+      .image-overlay.show {
+        display: flex;
+      }
+      .image-overlay img {
+        max-width: 90%;
+        max-height: 90%;
+        object-fit: contain;
+        border-radius: 8px;
+      }
+      .image-overlay .close-btn {
+        position: absolute;
+        top: 20px;
+        right: 30px;
+        color: white;
+        font-size: 2rem;
+        cursor: pointer;
+        background: none;
+        border: none;
+        font-family: sans-serif;
+      }
+      .image-overlay .close-btn:hover {
+        color: #e8a33d;
+      }
     </style>
   </head>
 
@@ -278,12 +298,6 @@
             ← Back to site
           </a>
         </div>
-      </div>
-
-      <!-- Notification Banner -->
-      <div id="notifBanner" class="notif-banner">
-        <span>🔔 Enable notifications for new messages</span>
-        <button class="btn-enable" onclick="requestNotificationPermission()">Enable</button>
       </div>
 
       <!-- Tabs -->
@@ -329,10 +343,6 @@
                 <button onclick="cancelReply()" class="text-faint/30 hover:text-danger/70 transition-colors">✕</button>
               </div>
               <div class="flex gap-2">
-                <select id="adminSenderSelect" class="bg-graphite border border-line rounded-lg px-3 py-2 text-sm text-ink/80 outline-none">
-                  <option value="sister">👩 Sister</option>
-                  <option value="brother">👨 Brother</option>
-                </select>
                 <input
                   type="text"
                   id="adminReplyInput"
@@ -349,20 +359,16 @@
               </div>
             </div>
 
-            <!-- General Message Input -->
+            <!-- General Message Input (Admin only) -->
             <div class="mt-4 pt-4 border-t border-line/50">
               <div class="flex items-center gap-2 mb-2 text-xs text-faint/60">
-                <span>📨 Send general message to all</span>
+                <span>🛡️ Send as Admin</span>
               </div>
               <div class="flex gap-2">
-                <select id="adminGeneralSender" class="bg-graphite border border-line rounded-lg px-3 py-2 text-sm text-ink/80 outline-none">
-                  <option value="sister">👩 Sister</option>
-                  <option value="brother">👨 Brother</option>
-                </select>
                 <input
                   type="text"
                   id="adminGeneralInput"
-                  placeholder="Type your message..."
+                  placeholder="Type your admin message..."
                   class="admin-reply-input flex-1"
                   onkeydown="if(event.key==='Enter') sendGeneralMessage()"
                 />
@@ -373,6 +379,9 @@
                   Send
                 </button>
               </div>
+              <p class="text-[10px] text-faint/30 mt-1.5 text-center font-mono">
+                📎 Paste an image (Ctrl+V) to send it as a photo
+              </p>
             </div>
           </div>
         </div>
@@ -397,71 +406,20 @@
     <!-- Toast -->
     <div id="toast" class="toast"></div>
 
+    <!-- Image Fullscreen Overlay -->
+    <div id="imageOverlay" class="image-overlay" onclick="closeImageOverlay()">
+      <button class="close-btn" onclick="closeImageOverlay()">✕</button>
+      <img id="overlayImage" src="" alt="Fullscreen image" />
+    </div>
+
     <script>
       const API_BASE = window.location.origin + "/api";
       let currentReplyTarget = null;
       let currentReplySender = null;
       let messagePollInterval = null;
       let lastSeenId = 0;
-      let notificationPermission = false;
       let editingMessageId = null;
-
-      // ============================================================
-      // NOTIFICATIONS
-      // ============================================================
-      function requestNotificationPermission() {
-        if (!("Notification" in window)) {
-          showToast("❌ This browser doesn't support notifications", "error");
-          return;
-        }
-
-        Notification.requestPermission().then((permission) => {
-          if (permission === "granted") {
-            notificationPermission = true;
-            document.getElementById("notifBanner").classList.remove("show");
-            showToast("✅ Notifications enabled!", "success");
-            sendBrowserNotification("🔔 Notifications active", "You'll receive alerts for new messages");
-          } else {
-            showToast("❌ Notification permission denied", "error");
-          }
-        });
-      }
-
-      function sendBrowserNotification(title, body) {
-        if (!("Notification" in window) || Notification.permission !== "granted") {
-          return;
-        }
-
-        try {
-          const options = {
-            body: body,
-            icon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48'%3E%3Ctext y='36' font-size='36'%3E💬%3C/text%3E%3C/svg%3E",
-            badge: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48'%3E%3Ctext y='36' font-size='36'%3E💬%3C/text%3E%3C/svg%3E",
-            tag: "seb-admin-message",
-            requireInteraction: true,
-            silent: false,
-          };
-
-          const notification = new Notification(title, options);
-          setTimeout(() => notification.close(), 10000);
-          
-          notification.onclick = function() {
-            window.focus();
-            this.close();
-          };
-        } catch (error) {
-          console.log("Notification error:", error);
-        }
-      }
-
-      // Check notification permission on load
-      if ("Notification" in window) {
-        if (Notification.permission === "granted") {
-          notificationPermission = true;
-        } else if (Notification.permission === "default") {
-          document.getElementById("notifBanner").classList.add("show");
-        }
-      }
+      let pendingAdminImage = null;
 
       // ============================================================
       // TOAST
@@ -476,6 +434,61 @@
           toast.classList.remove("show");
         }, 4000);
       }
+
+      // ============================================================
+      // IMAGE HANDLING
+      // ============================================================
+      function openImageFullscreen(src) {
+        const overlay = document.getElementById('imageOverlay');
+        const img = document.getElementById('overlayImage');
+        img.src = src;
+        overlay.classList.add('show');
+        document.body.style.overflow = 'hidden';
+      }
+
+      function closeImageOverlay() {
+        const overlay = document.getElementById('imageOverlay');
+        overlay.classList.remove('show');
+        document.body.style.overflow = '';
+      }
+
+      // Handle Ctrl+V paste for images in admin input
+      document.addEventListener('paste', function(e) {
+        const items = e.clipboardData.items;
+        let imageFound = false;
+        const target = e.target;
+        
+        // Only handle paste in admin inputs
+        if (!target.id || !['adminGeneralInput', 'adminReplyInput'].includes(target.id)) {
+          return;
+        }
+
+        for (let i = 0; i < items.length; i++) {
+          if (items[i].type.indexOf('image') !== -1) {
+            const file = items[i].getAsFile();
+            const reader = new FileReader();
+            
+            reader.onload = function(event) {
+              const imageData = event.target.result;
+              pendingAdminImage = imageData;
+              
+              // Show preview in input placeholder
+              target.placeholder = '📷 Image pasted! Press Send to share...';
+              target.style.borderColor = '#e8a33d';
+              
+              showToast('📷 Image pasted! Press Send to share it.', 'success');
+            };
+            
+            reader.readAsDataURL(file);
+            imageFound = true;
+            break;
+          }
+        }
+        
+        if (imageFound) {
+          e.preventDefault();
+        }
+      });
 
       // ============================================================
       // RENDER MESSAGES
@@ -506,6 +519,7 @@
             const isAdmin = msg.isAdminReply || false;
             const isReply = msg.replyTo;
             const isEditing = editingMessageId === msg.id;
+            const hasImage = msg.image && msg.image.startsWith('data:image');
 
             let replyHtml = "";
             if (isReply) {
@@ -516,10 +530,22 @@
                   <div class="text-[10px] text-faint/40 mb-1 flex items-center gap-1">
                     <span>↳</span>
                     <span>${origProfile.emoji}</span>
-                    <span class="truncate max-w-[100px]">${original.text.substring(0, 30)}${original.text.length > 30 ? '...' : ''}</span>
+                    <span class="truncate max-w-[100px]">${original.text ? original.text.substring(0, 30) : '[Image]'}${original.text && original.text.length > 30 ? '...' : ''}</span>
                   </div>
                 `;
               }
+            }
+
+            let imageHtml = "";
+            if (hasImage) {
+              imageHtml = `
+                <img 
+                  src="${msg.image}" 
+                  alt="Chat image" 
+                  class="chat-image"
+                  onclick="openImageFullscreen('${msg.image}')"
+                />
+              `;
             }
 
             // Message content - either edit mode or display mode
@@ -530,7 +556,7 @@
                   <input 
                     type="text" 
                     id="editInput_${msg.id}" 
-                    value="${msg.text.replace(/"/g, '&quot;')}" 
+                    value="${(msg.text || '').replace(/"/g, '&quot;')}" 
                     class="edit-input flex-1"
                     onkeydown="if(event.key==='Enter') saveEdit('${msg.id}')"
                   />
@@ -540,7 +566,8 @@
               `;
             } else {
               messageContent = `
-                <p class="text-sm text-ink/90 break-words">${msg.text}</p>
+                ${msg.text ? `<p class="text-sm text-ink/90 break-words">${msg.text}</p>` : ''}
+                ${imageHtml}
               `;
             }
 
@@ -677,6 +704,8 @@
         const wrapper = document.getElementById("adminReplyWrapper");
         wrapper.classList.add("hidden");
         document.getElementById("adminReplyInput").value = "";
+        document.getElementById("adminReplyInput").style.borderColor = '';
+        pendingAdminImage = null;
         currentReplyTarget = null;
         currentReplySender = null;
       }
@@ -687,23 +716,35 @@
       async function sendReply() {
         const input = document.getElementById("adminReplyInput");
         const text = input.value.trim();
-        if (!text || !currentReplyTarget) return;
-
-        const sender = document.getElementById("adminSenderSelect").value;
+        if (!text && !pendingAdminImage) {
+          showToast("❌ Please enter text or paste an image", "error");
+          return;
+        }
+        if (!currentReplyTarget) return;
 
         try {
+          const payload = {
+            messageId: currentReplyTarget,
+            replyText: text || '',
+            sender: 'admin',
+          };
+          
+          if (pendingAdminImage) {
+            payload.image = pendingAdminImage;
+          }
+
           const response = await fetch(`${API_BASE}/admin_reply`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              messageId: currentReplyTarget,
-              replyText: text,
-              sender: sender,
-            }),
+            body: JSON.stringify(payload),
           });
 
           if (!response.ok) throw new Error("Failed to send reply");
           showToast("✅ Reply sent successfully!", "success");
+          input.value = "";
+          input.placeholder = "Type your reply...";
+          input.style.borderColor = '';
+          pendingAdminImage = null;
           cancelReply();
           await loadMessages();
         } catch (error) {
@@ -712,25 +753,38 @@
       }
 
       // ============================================================
-      // SEND GENERAL MESSAGE
+      // SEND GENERAL MESSAGE (Admin only)
       // ============================================================
       async function sendGeneralMessage() {
         const input = document.getElementById("adminGeneralInput");
         const text = input.value.trim();
-        if (!text) return;
-
-        const sender = document.getElementById("adminGeneralSender").value;
+        if (!text && !pendingAdminImage) {
+          showToast("❌ Please enter text or paste an image", "error");
+          return;
+        }
 
         try {
+          const payload = {
+            text: text || '',
+            sender: 'admin',
+          };
+          
+          if (pendingAdminImage) {
+            payload.image = pendingAdminImage;
+          }
+
           const response = await fetch(`${API_BASE}/send_message`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ text, sender }),
+            body: JSON.stringify(payload),
           });
 
           if (!response.ok) throw new Error("Failed to send message");
-          showToast("✅ Message sent successfully!", "success");
+          showToast("✅ Admin message sent successfully!", "success");
           input.value = "";
+          input.placeholder = "Type your admin message...";
+          input.style.borderColor = '';
+          pendingAdminImage = null;
           await loadMessages();
         } catch (error) {
           showToast("❌ Failed to send message: " + error.message, "error");
@@ -759,27 +813,14 @@
             const currentMessages = data.messages;
             const lastMessage = currentMessages[currentMessages.length - 1];
             
-            // Check for new messages
             if (lastSeenId > 0 && lastMessage && parseInt(lastMessage.id) > lastSeenId) {
               const newMessages = currentMessages.filter(m => parseInt(m.id) > lastSeenId);
-              
-              // Send notifications for new messages (excluding admin's own replies)
-              newMessages.forEach(msg => {
-                if (!msg.isAdminReply) {
-                  const senderName = msg.sender === "sister" ? "Sister" : "Brother";
-                  const senderEmoji = msg.sender === "sister" ? "👩" : "👨";
-                  const title = `${senderEmoji} ${senderName}`;
-                  const body = msg.text.length > 60 ? msg.text.substring(0, 60) + "..." : msg.text;
-                  sendBrowserNotification(title, body);
-                }
-              });
             }
             
             if (lastMessage) {
               lastSeenId = parseInt(lastMessage.id);
             }
             
-            // Store messages for edit/delete operations
             localStorage.setItem('_seb_messages', JSON.stringify(currentMessages));
             renderMessages(currentMessages);
           }
@@ -886,11 +927,12 @@
       window.sendReply = sendReply;
       window.sendGeneralMessage = sendGeneralMessage;
       window.downloadFile = downloadFile;
-      window.requestNotificationPermission = requestNotificationPermission;
       window.startEdit = startEdit;
       window.cancelEdit = cancelEdit;
       window.saveEdit = saveEdit;
       window.deleteMessage = deleteMessage;
+      window.openImageFullscreen = openImageFullscreen;
+      window.closeImageOverlay = closeImageOverlay;
 
       window.addEventListener("beforeunload", () => {
         if (messagePollInterval) clearInterval(messagePollInterval);
