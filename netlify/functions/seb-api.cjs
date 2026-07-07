@@ -45,6 +45,7 @@ async function saveMessages(messages) {
     throw error;
   }
 }
+
 // ============================================================
 // EDIT MESSAGE
 // ============================================================
@@ -132,6 +133,7 @@ async function handleDeleteMessage(event) {
     };
   }
 }
+
 async function getNotifications() {
   try {
     const store = getBlobStore();
@@ -186,7 +188,7 @@ async function listFiles() {
       const filename = item.key.replace('files/', '');
       fileDetails.push({
         name: filename,
-        size: 0, // Size not available from list
+        size: 0,
         timestamp: new Date().toISOString()
       });
     }
@@ -340,11 +342,11 @@ async function handleGetMessages(event) {
 async function handleSendMessage(event) {
   try {
     const body = JSON.parse(event.body);
-    const { text, sender } = body;
-    if (!text || !sender) {
+    const { text, sender, image } = body;
+    if (!text && !image) {
       return { 
         statusCode: 400, 
-        body: JSON.stringify({ error: "Text and sender required" }) 
+        body: JSON.stringify({ error: "Text or image required" }) 
       };
     }
 
@@ -352,11 +354,18 @@ async function handleSendMessage(event) {
 
     const newMessage = {
       id: Date.now().toString(),
-      text,
-      sender,
+      text: text || '',
+      sender: sender || 'admin',
       timestamp: new Date().toISOString(),
-      isAdminReply: false,
+      isAdminReply: sender === 'admin' || false,
     };
+    
+    // Handle image data
+    if (image) {
+      newMessage.image = image;
+      newMessage.imageType = image.split(';')[0].split('/')[1] || 'png';
+    }
+    
     messages.push(newMessage);
     await saveMessages(messages);
     
@@ -364,9 +373,10 @@ async function handleSendMessage(event) {
     notificationState.lastNotificationId = parseInt(newMessage.id);
     notificationState.notifications.push({
       id: newMessage.id,
-      sender: sender,
-      text: text.substring(0, 100),
-      timestamp: newMessage.timestamp
+      sender: sender || 'admin',
+      text: text ? text.substring(0, 100) : '[Image]',
+      timestamp: newMessage.timestamp,
+      hasImage: !!image
     });
     if (notificationState.notifications.length > 50) {
       notificationState.notifications = notificationState.notifications.slice(-50);
@@ -389,7 +399,7 @@ async function handleSendMessage(event) {
 async function handleAdminReply(event) {
   try {
     const body = JSON.parse(event.body);
-    const { messageId, replyText, sender } = body;
+    const { messageId, replyText, sender, image } = body;
     if (!messageId || !replyText) {
       return { 
         statusCode: 400, 
@@ -415,6 +425,13 @@ async function handleAdminReply(event) {
       isAdminReply: true,
       replyTo: messageId,
     };
+    
+    // Handle image data
+    if (image) {
+      reply.image = image;
+      reply.imageType = image.split(';')[0].split('/')[1] || 'png';
+    }
+    
     messages.push(reply);
     messages[messageIndex].replied = true;
     await saveMessages(messages);
@@ -427,7 +444,8 @@ async function handleAdminReply(event) {
       text: replyText.substring(0, 100),
       timestamp: reply.timestamp,
       isAdminReply: true,
-      replyTo: messageId
+      replyTo: messageId,
+      hasImage: !!image
     });
     if (notificationState.notifications.length > 50) {
       notificationState.notifications = notificationState.notifications.slice(-50);
@@ -523,11 +541,10 @@ exports.handler = async (event, context) => {
   } else if (method === "GET" && path === "/download_file") {
     response = await handleDownloadFile(event);
   } else if (method === "POST" && path === "/edit_message") {
-  response = await handleEditMessage(event);
-} else if (method === "POST" && path === "/delete_message") {
-  response = await handleDeleteMessage(event);
-}
-  else {
+    response = await handleEditMessage(event);
+  } else if (method === "POST" && path === "/delete_message") {
+    response = await handleDeleteMessage(event);
+  } else {
     response = {
       statusCode: 200,
       body: JSON.stringify({
