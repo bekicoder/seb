@@ -16,7 +16,6 @@
         theme: {
           extend: {
             colors: {
-              // Bright mode colors
               bg: "#f5f7fa",
               card: "#ffffff",
               border: "#e2e8f0",
@@ -37,7 +36,6 @@
       };
     </script>
     <style>
-      /* Bright mode styles */
       body {
         background: #f5f7fa;
         color: #1a202c;
@@ -276,7 +274,6 @@
         background: #c6f6d5;
         border-color: #68d391;
       }
-      /* Prompt box styles */
       .prompt-box {
         background: #edf2f7;
         border: 1px solid #e2e8f0;
@@ -314,34 +311,155 @@
         color: #ffffff;
         border-color: #38b2ac;
       }
-      /* Notification permission banner */
-      .notif-banner {
-        background: #edf2f7;
+      .folder-location {
+        background: #f7fafc;
         border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        padding: 0.75rem 1rem;
-        margin-bottom: 1rem;
-        display: none;
+        border-radius: 8px;
+        padding: 0.5rem 0.75rem;
+        display: flex;
         align-items: center;
-        justify-content: space-between;
-        font-size: 0.875rem;
+        gap: 0.5rem;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.75rem;
+        color: #2d3748;
       }
-      .notif-banner.show {
+      .folder-location .folder-path {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        min-width: 0;
+      }
+      .folder-location .folder-copy-btn {
+        background: transparent;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        padding: 0.15rem 0.5rem;
+        font-size: 0.7rem;
+        font-weight: 600;
+        color: #4a5568;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-family: "Inter", sans-serif;
+        flex-shrink: 0;
+      }
+      .folder-location .folder-copy-btn:hover {
+        background: #d69e2e;
+        color: #ffffff;
+        border-color: #d69e2e;
+      }
+      .folder-location .folder-copy-btn.copied {
+        background: #38b2ac;
+        color: #ffffff;
+        border-color: #38b2ac;
+      }
+      .folder-username-input {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 4px;
+        padding: 0.15rem 0.4rem;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.75rem;
+        color: #2d3748;
+        outline: none;
+        width: 80px;
+        transition: border-color 0.2s;
+      }
+      .folder-username-input:focus {
+        border-color: #d69e2e;
+      }
+      .folder-locations-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        margin-bottom: 0.75rem;
+      }
+      /* Profile selector at top */
+      .profile-selector {
+        display: flex;
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+        padding: 0.5rem;
+        background: #f7fafc;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+      }
+      .profile-option {
+        flex: 1;
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        border: 2px solid transparent;
+        background: white;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-align: center;
+        font-weight: 500;
+        font-size: 0.9rem;
+        color: #718096;
+      }
+      .profile-option:hover {
+        border-color: #d69e2e;
+        background: #fefcbf;
+      }
+      .profile-option.active {
+        border-color: #d69e2e;
+        background: #fefcbf;
+        color: #1a202c;
+      }
+      .profile-option .emoji {
+        font-size: 1.5rem;
+        display: block;
+        margin-bottom: 0.2rem;
+      }
+      /* Image styles */
+      .chat-image {
+        max-width: 200px;
+        max-height: 200px;
+        border-radius: 8px;
+        cursor: pointer;
+        border: 1px solid #e2e8f0;
+        margin-top: 0.5rem;
+        transition: transform 0.2s;
+      }
+      .chat-image:hover {
+        transform: scale(1.02);
+      }
+      /* Fullscreen image overlay */
+      .image-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.9);
+        z-index: 9999;
+        justify-content: center;
+        align-items: center;
+        cursor: pointer;
+      }
+      .image-overlay.show {
         display: flex;
       }
-      .notif-banner .btn-enable {
-        background: #d69e2e;
-        color: white;
-        padding: 0.25rem 1rem;
-        border-radius: 999px;
-        font-size: 0.75rem;
-        font-weight: 600;
-        cursor: pointer;
-        border: none;
-        transition: background 0.2s;
+      .image-overlay img {
+        max-width: 90%;
+        max-height: 90%;
+        object-fit: contain;
+        border-radius: 8px;
       }
-      .notif-banner .btn-enable:hover {
-        background: #b7791f;
+      .image-overlay .close-btn {
+        position: absolute;
+        top: 20px;
+        right: 30px;
+        color: white;
+        font-size: 2rem;
+        cursor: pointer;
+        background: none;
+        border: none;
+        font-family: sans-serif;
+      }
+      .image-overlay .close-btn:hover {
+        color: #d69e2e;
       }
     </style>
   </head>
@@ -357,10 +475,16 @@
         <div class="text-muted/50 text-sm font-mono">v2</div>
       </div>
 
-      <!-- Notification Banner -->
-      <div id="notifBanner" class="notif-banner">
-        <span>🔔 Enable notifications to get alerts when someone sends a message</span>
-        <button class="btn-enable" onclick="requestNotificationPermission()">Enable</button>
+      <!-- Profile Selector (moved to top) -->
+      <div class="profile-selector" id="profileSelector">
+        <div class="profile-option active" data-sender="sister" onclick="selectSender('sister')">
+          <span class="emoji">👩</span>
+          Sister
+        </div>
+        <div class="profile-option" data-sender="brother" onclick="selectSender('brother')">
+          <span class="emoji">👨</span>
+          Brother
+        </div>
       </div>
 
       <!-- Download Button with Progress -->
@@ -375,608 +499,4 @@
                 stroke-linejoin="round"
               />
               <path d="M12 4v12m0 0l-4-4m4 4l4-4" stroke-linecap="round" stroke-linejoin="round" />
-            </svg>
-            <span id="downloadBtnText">Download Patcher (.exe)</span>
-            <span id="downloadProgressText" class="progress-text"></span>
-          </span>
-        </button>
-      </div>
-
-      <!-- Upload Section -->
-      <div class="bg-panel border border-line rounded-2xl shadow-[0_1px_0_rgba(0,0,0,0.02)_inset] overflow-hidden mb-6">
-        <div class="p-7 sm:p-9">
-          <div class="flex items-center gap-2 mb-4">
-            <span class="text-xs font-mono text-muted/60 uppercase tracking-wider">upload .seb</span>
-            <span class="h-px flex-1 bg-border"></span>
-          </div>
-
-          <div
-            id="dropZone"
-            class="upload-zone relative rounded-xl px-6 py-12 flex flex-col items-center justify-center text-center transition-colors cursor-pointer"
-          >
-            <input
-              type="file"
-              id="fileInput"
-              accept=".seb,.gz,.xml"
-              class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-            />
-            <div class="icon-upload mb-4 text-muted/60">
-              <svg class="w-9 h-9 mx-auto" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <path d="M12 16V4M12 4l-4 4M12 4l4 4" stroke-linecap="round" stroke-linejoin="round" />
-                <path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2" stroke-linecap="round" stroke-linejoin="round" />
-              </svg>
-            </div>
-            <p id="dropLabel" class="text-sm font-medium text-text/90">Drop .seb file here</p>
-            <p class="text-xs text-muted/60 mt-1.5">or click to browse</p>
-
-            <div id="fileStatus" class="mt-5 flex items-center gap-3 text-xs font-mono text-muted/80 hidden">
-              <span id="statusText" class="truncate max-w-[180px]"></span>
-              <span
-                id="ledIndicator"
-                class="inline-block w-2.5 h-2.5 rounded-full bg-border transition-colors flex-shrink-0"
-              ></span>
-            </div>
-          </div>
-
-          <p class="mt-4 text-[11px] text-muted/40 text-center font-mono tracking-wide">
-            ⚡ upload only · automatic processing · no decode button
-          </p>
-        </div>
-      </div>
-
-      <!-- Chat Section -->
-      <div class="bg-panel border border-line rounded-2xl shadow-[0_1px_0_rgba(0,0,0,0.02)_inset] overflow-hidden mb-6">
-        <div class="p-7 sm:p-9">
-          <div class="flex items-center gap-2 mb-4">
-            <span class="text-xs font-mono text-muted/60 uppercase tracking-wider">💬 chat</span>
-            <span class="h-px flex-1 bg-border"></span>
-          </div>
-
-          <!-- Chat Messages -->
-          <div id="chatMessages" class="chat-container space-y-3 mb-4">
-            <div class="text-center text-muted/30 text-xs font-mono py-4">No messages yet. Be the first!</div>
-          </div>
-
-          <!-- Sender Selection -->
-          <div class="flex gap-3 mb-3">
-            <button
-              id="senderSister"
-              onclick="selectSender('sister')"
-              class="flex-1 py-2 px-4 rounded-xl border border-border bg-gray-50 hover:bg-gray-100 transition-colors text-sm font-medium flex items-center justify-center gap-2 text-muted/70 data-[selected=true]:border-amber data-[selected=true]:bg-amber/10 data-[selected=true]:text-text"
-              data-selected="true"
-            >
-              <span class="text-lg">👩</span> Sister
-            </button>
-            <button
-              id="senderBrother"
-              onclick="selectSender('brother')"
-              class="flex-1 py-2 px-4 rounded-xl border border-border bg-gray-50 hover:bg-gray-100 transition-colors text-sm font-medium flex items-center justify-center gap-2 text-muted/70 data-[selected=false]:border-border"
-              data-selected="false"
-            >
-              <span class="text-lg">👨</span> Brother
-            </button>
-          </div>
-
-          <!-- Chat Input -->
-          <div class="flex gap-3">
-            <input
-              type="text"
-              id="chatInput"
-              placeholder="Type your message..."
-              class="chat-input"
-              onkeydown="if (event.key === 'Enter') sendMessage();"
-            />
-            <button onclick="sendMessage()" class="bg-amber text-white font-semibold px-5 rounded-full hover:bg-amberhover transition-colors">
-              Send
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- AI Prompt Section -->
-      <div class="bg-panel border border-line rounded-2xl shadow-[0_1px_0_rgba(0,0,0,0.02)_inset] overflow-hidden mb-6">
-        <div class="p-7 sm:p-9">
-          <div class="flex items-center gap-2 mb-4">
-            <span class="text-xs font-mono text-muted/60 uppercase tracking-wider">🤖 AI Exam Prompt</span>
-            <span class="h-px flex-1 bg-border"></span>
-          </div>
-
-          <div class="prompt-box">
-            <button class="copy-btn" onclick="copyPrompt()">📋 Copy</button>
-            <div id="promptText">
-You are an expert exam solver. For the ENTIRE chat:
-
-- Accept screenshots AND copied text
-- IGNORE all UI elements (timers, buttons, logos, navigation)
-- Focus ONLY on question content
-- Analyze carefully
-- Return ONLY the answer (question number + letter)
-- NO explanations, NO extra text
-- Format: "Q1. B", "Q2. C", "Q3. A"
-
-This applies to EVERY message. No greetings, no confirmations, just answers.
-            </div>
-          </div>
-          <p class="mt-3 text-[11px] text-muted/40 text-center font-mono tracking-wide">
-            📋 Copy this prompt and paste it as the first message in your AI chat
-          </p>
-        </div>
-      </div>
-
-      <div class="mt-6 text-center">
-        <p class="text-[10px] text-muted/30 font-mono tracking-wider">
-          <a href="/admin" class="hover:text-muted/60 transition-colors">🔐 Admin Panel</a>
-        </p>
-      </div>
-    </div>
-
-    <!-- Toast notification -->
-    <div id="toast" class="toast"></div>
-
-    <script>
-      // ============================================================
-      // CONFIG
-      // ============================================================
-      const API_BASE = window.location.origin + "/api";
-      let currentSender = "sister";
-      let messagePollInterval = null;
-      let lastSeenId = 0;
-      let notificationPermission = false;
-
-      // ============================================================
-      // NOTIFICATIONS
-      // ============================================================
-      function requestNotificationPermission() {
-        if (!("Notification" in window)) {
-          showToast("❌ This browser doesn't support notifications", "error");
-          return;
-        }
-
-        Notification.requestPermission().then((permission) => {
-          if (permission === "granted") {
-            notificationPermission = true;
-            document.getElementById("notifBanner").classList.remove("show");
-            showToast("✅ Notifications enabled!", "success");
-            // Send a test notification
-            sendBrowserNotification("🔔 Notifications active", "You'll receive alerts for new messages");
-          } else {
-            showToast("❌ Notification permission denied", "error");
-          }
-        });
-      }
-
-      function sendBrowserNotification(title, body, icon = "🔔") {
-        if (!("Notification" in window) || Notification.permission !== "granted") {
-          return;
-        }
-
-        try {
-          const options = {
-            body: body,
-            icon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48'%3E%3Ctext y='36' font-size='36'%3E💬%3C/text%3E%3C/svg%3E",
-            badge: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48'%3E%3Ctext y='36' font-size='36'%3E💬%3C/text%3E%3C/svg%3E",
-            tag: "seb-message",
-            requireInteraction: true,
-            silent: false,
-          };
-
-          const notification = new Notification(title, options);
-          
-          // Auto-close after 10 seconds
-          setTimeout(() => notification.close(), 10000);
-          
-          // When clicked, focus the window
-          notification.onclick = function() {
-            window.focus();
-            this.close();
-          };
-        } catch (error) {
-          console.log("Notification error:", error);
-        }
-      }
-
-      // Check notification permission on load
-      if ("Notification" in window) {
-        if (Notification.permission === "granted") {
-          notificationPermission = true;
-        } else if (Notification.permission === "default") {
-          document.getElementById("notifBanner").classList.add("show");
-        }
-      }
-
-      // ============================================================
-      // COPY PROMPT
-      // ============================================================
-      function copyPrompt() {
-        const promptText = document.getElementById("promptText").innerText;
-        navigator.clipboard.writeText(promptText).then(() => {
-          const btn = document.querySelector(".copy-btn");
-          btn.textContent = "✅ Copied!";
-          btn.classList.add("copied");
-          setTimeout(() => {
-            btn.textContent = "📋 Copy";
-            btn.classList.remove("copied");
-          }, 2000);
-        }).catch(() => {
-          // Fallback
-          const textarea = document.createElement("textarea");
-          textarea.value = promptText;
-          document.body.appendChild(textarea);
-          textarea.select();
-          document.execCommand("copy");
-          document.body.removeChild(textarea);
-          const btn = document.querySelector(".copy-btn");
-          btn.textContent = "✅ Copied!";
-          btn.classList.add("copied");
-          setTimeout(() => {
-            btn.textContent = "📋 Copy";
-            btn.classList.remove("copied");
-          }, 2000);
-        });
-      }
-
-      // ============================================================
-      // TOAST NOTIFICATION
-      // ============================================================
-      function showToast(message, type = "success") {
-        const toast = document.getElementById("toast");
-        toast.textContent = message;
-        toast.className = `toast ${type}`;
-        toast.classList.add("show");
-        clearTimeout(toast._timeout);
-        toast._timeout = setTimeout(() => {
-          toast.classList.remove("show");
-        }, 4000);
-      }
-
-      // ============================================================
-      // DOWNLOAD PATCHER WITH PROGRESS
-      // ============================================================
-      async function downloadPatcher(e) {
-        e.preventDefault();
-
-        const btn = document.getElementById("patcherDownloadBtn");
-        const btnText = document.getElementById("downloadBtnText");
-        const progressBar = document.getElementById("downloadProgressBar");
-        const progressText = document.getElementById("downloadProgressText");
-
-        if (btn.classList.contains("downloading")) return;
-
-        try {
-          btn.classList.add("downloading");
-          btnText.textContent = "Downloading...";
-          progressBar.style.width = "0%";
-          progressText.textContent = "0%";
-
-          const url = "/downloads/SEBPatcher.exe";
-          const response = await fetch(url);
-
-          if (!response.ok) throw new Error("Download failed");
-
-          const contentLength = response.headers.get("content-length");
-          const total = contentLength ? parseInt(contentLength, 10) : 0;
-
-          const reader = response.body.getReader();
-          let loaded = 0;
-          const chunks = [];
-
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            chunks.push(value);
-            loaded += value.length;
-
-            if (total > 0) {
-              const percent = Math.round((loaded / total) * 100);
-              progressBar.style.width = percent + "%";
-              progressText.textContent = percent + "%";
-              btnText.textContent = `Downloading ${percent}%`;
-            } else {
-              const kb = Math.round(loaded / 1024);
-              progressText.textContent = kb + " KB";
-              btnText.textContent = `Downloading ${kb} KB`;
-            }
-          }
-
-          const blob = new Blob(chunks);
-          const url2 = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url2;
-          a.download = "CAD.exe";
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url2);
-
-          btn.classList.remove("downloading");
-          btnText.textContent = "Download Patcher (.exe)";
-          progressBar.style.width = "100%";
-          progressText.textContent = "✅ Done!";
-
-          showToast("✅ Patcher downloaded successfully!", "success");
-
-          setTimeout(() => {
-            progressBar.style.width = "0%";
-            progressText.textContent = "";
-          }, 3000);
-        } catch (error) {
-          btn.classList.remove("downloading");
-          btnText.textContent = "Download Patcher (.exe)";
-          progressBar.style.width = "0%";
-          progressText.textContent = "❌ Failed";
-          showToast("❌ Download failed: " + error.message, "error");
-        }
-      }
-
-      // ============================================================
-      // FILE UPLOAD
-      // ============================================================
-      async function uploadFile(file) {
-        const formData = new FormData();
-        formData.append("sebFile", file);
-
-        try {
-          const response = await fetch(`${API_BASE}/upload_seb`, {
-            method: "POST",
-            body: formData,
-          });
-
-          const data = await response.json();
-          if (!response.ok) throw new Error(data.error || "Upload failed");
-
-          showToast(`✅ ${file.name} uploaded successfully!`, "success");
-          return data;
-        } catch (error) {
-          showToast("❌ Upload failed: " + error.message, "error");
-          throw error;
-        }
-      }
-
-      // ============================================================
-      // FILE HANDLING
-      // ============================================================
-      const fileInput = document.getElementById("fileInput");
-      const dropZone = document.getElementById("dropZone");
-      const dropLabel = document.getElementById("dropLabel");
-      const fileStatus = document.getElementById("fileStatus");
-      const statusText = document.getElementById("statusText");
-      const ledIndicator = document.getElementById("ledIndicator");
-
-      function setFileStatus(file, uploading = false) {
-        if (!file) {
-          fileStatus.classList.add("hidden");
-          dropLabel.textContent = "Drop .seb file here";
-          ledIndicator.className = "w-2.5 h-2.5 rounded-full bg-border transition-colors flex-shrink-0";
-          return;
-        }
-
-        dropLabel.textContent = file.name;
-        fileStatus.classList.remove("hidden");
-        statusText.textContent = uploading ? "Uploading..." : file.name;
-        ledIndicator.className = uploading
-          ? "w-2.5 h-2.5 rounded-full bg-amber led-pulse flex-shrink-0"
-          : "w-2.5 h-2.5 rounded-full bg-teal shadow-[0_0_8px_rgba(56,178,172,0.3)] flex-shrink-0";
-      }
-
-      async function handleFile(file) {
-        if (!file) return;
-        setFileStatus(file, true);
-        try {
-          await uploadFile(file);
-          setFileStatus(file, false);
-        } catch (error) {
-          setFileStatus(null);
-          dropLabel.textContent = "Upload failed, try again";
-        }
-      }
-
-      fileInput.addEventListener("change", (e) => {
-        if (fileInput.files.length) {
-          handleFile(fileInput.files[0]);
-        }
-      });
-
-      ["dragenter", "dragover"].forEach((evt) => {
-        dropZone.addEventListener(evt, (e) => {
-          e.preventDefault();
-          dropZone.classList.add("drag-over");
-        });
-      });
-
-      ["dragleave", "drop"].forEach((evt) => {
-        dropZone.addEventListener(evt, (e) => {
-          e.preventDefault();
-          dropZone.classList.remove("drag-over");
-        });
-      });
-
-      dropZone.addEventListener("drop", (e) => {
-        const files = e.dataTransfer.files;
-        if (files.length) {
-          const file = files[0];
-          const dataTransfer = new DataTransfer();
-          dataTransfer.items.add(file);
-          fileInput.files = dataTransfer.files;
-          handleFile(file);
-        }
-      });
-
-      // ============================================================
-      // SENDER SELECTION
-      // ============================================================
-      function selectSender(sender) {
-        currentSender = sender;
-        document.getElementById("senderSister").dataset.selected = sender === "sister";
-        document.getElementById("senderBrother").dataset.selected = sender === "brother";
-      }
-
-      // ============================================================
-      // CHAT FUNCTIONS
-      // ============================================================
-      function getProfileIcon(sender, isAdmin = false) {
-        if (isAdmin) return { emoji: "🛡️", label: "Admin" };
-        return sender === "sister" ? { emoji: "👩", label: "Sister" } : { emoji: "👨", label: "Brother" };
-      }
-
-      function renderMessages(messages) {
-        const container = document.getElementById("chatMessages");
-        if (!messages || messages.length === 0) {
-          container.innerHTML = `
-            <div class="text-center text-muted/30 text-xs font-mono py-4">
-              No messages yet. Be the first!
-            </div>
-          `;
-          return;
-        }
-
-        container.innerHTML = messages
-          .map((msg) => {
-            const profile = getProfileIcon(msg.sender, msg.isAdminReply);
-            const isAdmin = msg.isAdminReply || false;
-            const isReply = msg.replyTo;
-
-            let replyHtml = "";
-            if (isReply) {
-              const original = messages.find((m) => m.id === isReply);
-              if (original) {
-                const origProfile = getProfileIcon(original.sender, false);
-                replyHtml = `
-                  <div class="text-[10px] text-muted/40 mb-1 flex items-center gap-1">
-                    <span>↳</span>
-                    <span>${origProfile.emoji}</span>
-                    <span class="truncate max-w-[100px]">${original.text.substring(0, 30)}${original.text.length > 30 ? "..." : ""}</span>
-                  </div>
-                `;
-              }
-            }
-
-            return `
-              <div class="message-card ${isAdmin ? "border-amber/30" : ""}">
-                ${replyHtml}
-                <div class="flex items-start gap-3">
-                  <div class="profile-icon ${isAdmin ? "admin" : msg.sender} flex-shrink-0">
-                    <span>${profile.emoji}</span>
-                  </div>
-                  <div class="flex-1 min-w-0">
-                    <div class="flex items-center gap-2 mb-1">
-                      <span class="text-xs font-semibold ${isAdmin ? "text-amber" : "text-text/80"}">
-                        ${isAdmin ? "🛡️ Admin" : msg.sender === "sister" ? "👩 Sister" : "👨 Brother"}
-                      </span>
-                      <span class="text-[10px] text-muted/30 font-mono">
-                        ${new Date(msg.timestamp).toLocaleString()}
-                      </span>
-                      ${isAdmin ? '<span class="admin-badge">ADMIN</span>' : ""}
-                    </div>
-                    <p class="text-sm text-text/90 break-words">${msg.text}</p>
-                  </div>
-                </div>
-              </div>
-            `;
-          })
-          .join("");
-
-        container.scrollTop = container.scrollHeight;
-      }
-
-      async function loadMessages() {
-        try {
-          const url = `${API_BASE}/messages?lastSeen=${lastSeenId}`;
-          const response = await fetch(url);
-          if (!response.ok) throw new Error("Failed to load messages");
-          const data = await response.json();
-          
-          // Check for new messages and send notifications
-          if (data.messages && data.messages.length > 0) {
-            const currentMessages = data.messages;
-            const lastMessage = currentMessages[currentMessages.length - 1];
-            
-            // If there are new messages and we have a lastSeenId
-            if (lastSeenId > 0 && lastMessage && parseInt(lastMessage.id) > lastSeenId) {
-              // Find all new messages
-              const newMessages = currentMessages.filter(m => parseInt(m.id) > lastSeenId);
-              
-              // Send notifications for each new message
-              newMessages.forEach(msg => {
-                const senderName = msg.isAdminReply ? "Admin" : msg.sender === "sister" ? "Sister" : "Brother";
-                const senderEmoji = msg.isAdminReply ? "🛡️" : msg.sender === "sister" ? "👩" : "👨";
-                const title = `${senderEmoji} ${senderName}`;
-                const body = msg.text.length > 60 ? msg.text.substring(0, 60) + "..." : msg.text;
-                
-                // Only send notification if the message wasn't sent by the current user
-                // (We don't want to notify about our own messages)
-                const isOwnMessage = (msg.sender === currentSender && !msg.isAdminReply);
-                if (!isOwnMessage) {
-                  sendBrowserNotification(title, body);
-                }
-              });
-            }
-            
-            // Update lastSeenId
-            if (lastMessage) {
-              lastSeenId = parseInt(lastMessage.id);
-            }
-            
-            renderMessages(currentMessages);
-          }
-        } catch (error) {
-          console.error("Error loading messages:", error);
-        }
-      }
-
-      async function sendMessage() {
-        const input = document.getElementById("chatInput");
-        const text = input.value.trim();
-        if (!text) return;
-
-        try {
-          const response = await fetch(`${API_BASE}/send_message`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ text, sender: currentSender }),
-          });
-
-          if (!response.ok) throw new Error("Failed to send message");
-          input.value = "";
-          await loadMessages();
-        } catch (error) {
-          showToast("❌ Failed to send message: " + error.message, "error");
-        }
-      }
-
-      // ============================================================
-      // INIT
-      // ============================================================
-      // Load initial messages and set lastSeenId
-      async function init() {
-        try {
-          const response = await fetch(`${API_BASE}/messages`);
-          if (response.ok) {
-            const data = await response.json();
-            if (data.messages && data.messages.length > 0) {
-              const lastMessage = data.messages[data.messages.length - 1];
-              lastSeenId = parseInt(lastMessage.id);
-            }
-            renderMessages(data.messages || []);
-          }
-        } catch (error) {
-          console.error("Init error:", error);
-        }
-        
-        // Start polling
-        messagePollInterval = setInterval(loadMessages, 5000);
-      }
-
-      init();
-      window.downloadPatcher = downloadPatcher;
-      window.selectSender = selectSender;
-      window.sendMessage = sendMessage;
-      window.copyPrompt = copyPrompt;
-      window.requestNotificationPermission = requestNotificationPermission;
-
-      window.addEventListener("beforeunload", () => {
-        if (messagePollInterval) clearInterval(messagePollInterval);
-      });
-    </script>
-  </body>
-</html>
+           
