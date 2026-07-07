@@ -158,6 +158,7 @@ async function saveNotifications(notifications) {
 async function saveFile(filename, content) {
   try {
     const store = getBlobStore();
+    // Store as base64 for binary files
     const base64Content = content.toString('base64');
     await store.set(`files/${filename}`, base64Content);
   } catch (error) {
@@ -224,10 +225,6 @@ async function listFiles() {
     return [];
   }
 }
-
-// ============================================================
-// ORIGINAL FUNCTIONS (UNCHANGED)
-// ============================================================
 
 function generateRandomString(length = 10) {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -367,11 +364,11 @@ async function handleGetMessages(event) {
 async function handleSendMessage(event) {
   try {
     const body = JSON.parse(event.body);
-    const { text, sender, image } = body;
-    if (!text && !image) {
+    const { text, sender, image, fileData, fileName, fileSize } = body;
+    if (!text && !image && !fileData) {
       return { 
         statusCode: 400, 
-        body: JSON.stringify({ error: "Text or image required" }) 
+        body: JSON.stringify({ error: "Text, image, or file required" }) 
       };
     }
 
@@ -391,6 +388,25 @@ async function handleSendMessage(event) {
       newMessage.imageType = image.split(';')[0].split('/')[1] || 'png';
     }
     
+    // Handle file attachment
+    if (fileData && fileName) {
+      // Generate unique filename
+      const ext = fileName.includes('.') ? fileName.split('.').pop() : '';
+      const baseName = fileName.replace(/\.[^.]+$/, '') || 'file';
+      const uniqueName = `${baseName}_${generateRandomString(8)}${ext ? '.' + ext : ''}`;
+      
+      // Save the file
+      const fileBuffer = Buffer.from(fileData, 'base64');
+      await saveFile(uniqueName, fileBuffer);
+      
+      newMessage.file = {
+        name: fileName,
+        storedName: uniqueName,
+        size: fileSize || fileBuffer.length,
+        type: 'attachment'
+      };
+    }
+    
     messages.push(newMessage);
     await saveMessages(messages);
     
@@ -399,9 +415,10 @@ async function handleSendMessage(event) {
     notificationState.notifications.push({
       id: newMessage.id,
       sender: sender || 'admin',
-      text: text ? text.substring(0, 100) : '[Image]',
+      text: text ? text.substring(0, 100) : (image ? '[Image]' : (fileData ? '[File]' : '')),
       timestamp: newMessage.timestamp,
-      hasImage: !!image
+      hasImage: !!image,
+      hasFile: !!fileData
     });
     if (notificationState.notifications.length > 50) {
       notificationState.notifications = notificationState.notifications.slice(-50);
@@ -413,9 +430,10 @@ async function handleSendMessage(event) {
       body: JSON.stringify({ message: "Message sent", data: newMessage }) 
     };
   } catch (error) {
+    console.error('Send message error:', error);
     return { 
       statusCode: 500, 
-      body: JSON.stringify({ error: "Failed to send message" }) 
+      body: JSON.stringify({ error: "Failed to send message", details: error.message }) 
     };
   }
 }
@@ -424,11 +442,11 @@ async function handleSendMessage(event) {
 async function handleAdminReply(event) {
   try {
     const body = JSON.parse(event.body);
-    const { messageId, replyText, sender, image } = body;
-    if (!messageId || !replyText) {
+    const { messageId, replyText, sender, image, fileData, fileName, fileSize } = body;
+    if (!messageId || (!replyText && !fileData && !image)) {
       return { 
         statusCode: 400, 
-        body: JSON.stringify({ error: "Message ID and reply text required" }) 
+        body: JSON.stringify({ error: "Message ID and reply text/image/file required" }) 
       };
     }
 
@@ -444,7 +462,7 @@ async function handleAdminReply(event) {
 
     const reply = {
       id: Date.now().toString(),
-      text: replyText,
+      text: replyText || '',
       sender: sender || 'admin',
       timestamp: new Date().toISOString(),
       isAdminReply: true,
@@ -457,6 +475,23 @@ async function handleAdminReply(event) {
       reply.imageType = image.split(';')[0].split('/')[1] || 'png';
     }
     
+    // Handle file attachment
+    if (fileData && fileName) {
+      const ext = fileName.includes('.') ? fileName.split('.').pop() : '';
+      const baseName = fileName.replace(/\.[^.]+$/, '') || 'file';
+      const uniqueName = `${baseName}_${generateRandomString(8)}${ext ? '.' + ext : ''}`;
+      
+      const fileBuffer = Buffer.from(fileData, 'base64');
+      await saveFile(uniqueName, fileBuffer);
+      
+      reply.file = {
+        name: fileName,
+        storedName: uniqueName,
+        size: fileSize || fileBuffer.length,
+        type: 'attachment'
+      };
+    }
+    
     messages.push(reply);
     messages[messageIndex].replied = true;
     await saveMessages(messages);
@@ -466,11 +501,12 @@ async function handleAdminReply(event) {
     notificationState.notifications.push({
       id: reply.id,
       sender: 'admin',
-      text: replyText.substring(0, 100),
+      text: replyText ? replyText.substring(0, 100) : (image ? '[Image]' : (fileData ? '[File]' : '')),
       timestamp: reply.timestamp,
       isAdminReply: true,
       replyTo: messageId,
-      hasImage: !!image
+      hasImage: !!image,
+      hasFile: !!fileData
     });
     if (notificationState.notifications.length > 50) {
       notificationState.notifications = notificationState.notifications.slice(-50);
@@ -482,9 +518,10 @@ async function handleAdminReply(event) {
       body: JSON.stringify({ message: "Reply sent", data: reply }) 
     };
   } catch (error) {
+    console.error('Admin reply error:', error);
     return { 
       statusCode: 500, 
-      body: JSON.stringify({ error: "Failed to send reply" }) 
+      body: JSON.stringify({ error: "Failed to send reply", details: error.message }) 
     };
   }
 }
@@ -581,6 +618,8 @@ exports.handler = async (event, context) => {
           send_message: "POST /api/send_message",
           admin_reply: "POST /api/admin_reply",
           download_file: "GET /api/download_file?filename=example.seb",
+          edit_message: "POST /api/edit_message",
+          delete_message: "POST /api/delete_message",
         },
       }),
     };
